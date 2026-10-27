@@ -21,8 +21,8 @@ LESSON_SCHEMA = {
         "language": {"type": "string"},
         "scenes": {
             "type": "array",
-            "minItems": 2,
-            "maxItems": 6,
+            "minItems": 3,
+            "maxItems": 12,
             "items": {
                 "type": "object",
                 "properties": {
@@ -55,10 +55,10 @@ def generate_lesson_plan(topic: str, level: str = "beginner", language: str = "e
     """
     t0 = time.time()
 
-    # Keep lessons short at the minimum duration and add slides for longer requests.
-    base_scene_count = max(2, min(6, round(target_length / 50)))
+    # Plan roughly one presentation slide per 30 seconds, with room for level detail.
+    base_scene_count = max(3, min(10, (target_length + 29) // 30))
     level_scene_bonus = 1 if level == "intermediate" else 0
-    num_scenes = min(6, base_scene_count + level_scene_bonus)
+    num_scenes = min(12, base_scene_count + level_scene_bonus)
     target_words = max(65, round(target_length * 2.1))
     language_names = {
         "en": "English",
@@ -75,16 +75,16 @@ Topic: {topic}
 Learner level: {level}
 Write the lesson in English. The app will translate narration to {language_name} (language code: {language}).
 Target video duration: {target_length} seconds
-Create exactly {num_scenes} distinct scenes and about {target_words} words of narration in total.
+Create exactly {num_scenes} presentation slides (scenes) and about {target_words} words of narration in total.
 
-Use an engaging progression: introduce the exact topic, explain its important parts, give a relevant example or application, then recap. Use a code_walkthrough scene for programming topics and include valid code and highlight_lines. Use diagram scenes for processes and concepts. Include a short quiz when there are enough scenes.
+Treat the scenes as a complete slide presentation. Give every slide a clear, specific heading, useful on-slide visual content, and narration that explains that slide. Use diagram scenes with 2-4 concise, topic-specific items to teach concepts; use code_walkthrough scenes with valid code and highlight_lines for programming; include concrete examples, applications, or a quiz when appropriate. Reserve the first slide for the introduction and the last slide for a recap. Do not fill the extra slides by repeating generic summaries.
 
 For beginners, use everyday words, avoid unexplained technical terms, and explain any necessary new term simply. For intermediate learners, include appropriate technical vocabulary and briefly explain less familiar terms.
-Every scene must contribute a different, topic-specific idea. Do not repeat the same generic steps across topics.
+Every slide must contribute a different, topic-specific idea. The slide headings, visual items, examples, and narration must all teach the requested topic rather than generic filler.
 
 Return ONLY one valid JSON object with this structure:
-{{"title":"A topic-specific title","level":"{level}","language":"en","scenes":[{{"type":"title_card","heading":"Scene heading","narration":"Spoken explanation","subheading":"Optional","items":[{{"label":"Label","value":"Detail"}}],"code":"Optional code","highlight_lines":[1],"output":"Optional output","question":"Optional quiz question","options":["A","B"],"answer":"Optional correct answer"}}]}}
-Use only scene types title_card, diagram, code_walkthrough, quiz, and summary. Include only relevant optional fields. Ensure the JSON is complete and has exactly {num_scenes} scenes."""
+{{"title":"A topic-specific title","level":"{level}","language":"en","scenes":[{{"type":"title_card","heading":"Slide heading","narration":"Slide narration","subheading":"Optional","items":[{{"label":"Key idea","value":"Visible slide detail"}}],"code":"Optional code","highlight_lines":[1],"output":"Optional output","question":"Optional quiz question","options":["A","B"],"answer":"Optional correct answer"}}]}}
+Use only scene types title_card, diagram, code_walkthrough, quiz, and summary. Include useful on-slide items for diagram and summary scenes. Include only relevant optional fields. Ensure the JSON is complete and has exactly {num_scenes} scenes."""
 
     try:
         response = requests.post(
@@ -96,12 +96,12 @@ Use only scene types title_card, diagram, code_walkthrough, quiz, and summary. I
                 "format": "json",
                 "options": {
                     "temperature": 0.35,
-                    "num_predict": max(900, min(2400, target_words * 4)),
+                    "num_predict": max(1400, min(4096, target_words * 5)),
                     "num_thread": 4,
-                    "num_ctx": 4096
+                    "num_ctx": 8192
                 }
             },
-            timeout=60
+            timeout=120
         )
         if response.status_code == 200:
             raw_text = response.json().get("response", "").strip()
@@ -152,17 +152,23 @@ def translate_lesson_plan(plan: dict, target_lang: str) -> dict:
         translated_scenes = []
         for sc in plan.get("scenes", []):
             sc_copy = dict(sc)
+            narration = sc.get("narration", "")
             # Fast translate narration
-            trans_prompt = f"Translate to {target_name} script only (keep code/technical terms in English, no explanation):\n{sc['narration']}"
+            trans_prompt = f"Translate to {target_name} script only (keep code/technical terms in English, no explanation):\n{narration}"
             res = requests.post(
                 OLLAMA_URL,
                 json={
                     "model": MODEL_NAME,
                     "prompt": trans_prompt,
                     "stream": False,
-                    "options": {"temperature": 0.1, "num_predict": 100, "num_thread": 4, "num_ctx": 512}
+                    "options": {
+                        "temperature": 0.1,
+                        "num_predict": max(180, min(400, len(narration.split()) * 3)),
+                        "num_thread": 4,
+                        "num_ctx": 1024,
+                    }
                 },
-                timeout=10
+                timeout=30
             )
             res.raise_for_status()
             if res.status_code == 200:

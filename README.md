@@ -24,7 +24,7 @@ Built for the **Blu Visual Teacher Hackathon (2026)**.
   - **6 Languages**: English + 5 Indian languages (Hindi, Tamil, Telugu, Marathi, Bengali).
   - **Re-Voice Lesson**: Switch languages for an already planned lesson without re-planning it.
   - **Voice & Speed Control**: Male (`hm_omega`), Female (`hf_alpha`), and 0.8x–1.3x speed slider.
-  - **Adaptive Lesson Planning**: Scene count and narration length scale with the selected video duration; intermediate lessons add a scene when possible, and vocabulary adapts to the learner level.
+  - **Adaptive Lesson Planning**: Ollama creates 3–10 topic-specific presentation slides for a 30-second to 5-minute lesson (with an extra slide for intermediate learners when possible). Narration length and vocabulary also adapt to duration and learner level.
   - **Teacher Scene Editor**: Tweak narration, code, or headings before rendering and regenerate only that scene.
   - **Lesson Caching**: Hash-based disk cache for instant replay.
   - **Stage Benchmarking**: Live timer display for each stage (Planner, TTS, Video).

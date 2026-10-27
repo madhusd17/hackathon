@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(BASE_DIR, "cache")
+CACHE_FORMAT_VERSION = "presentation_v2"
 
 
 def get_cache_key(
@@ -24,7 +25,7 @@ def get_cache_key(
     target_length: int = 45,
 ) -> str:
     """Generates a stable cache key string."""
-    raw = f"{topic.strip().lower()}_{language.strip().lower()}_{level.strip().lower()}_{voice.strip().lower()}"
+    raw = f"{topic.strip().lower()}_{language.strip().lower()}_{level.strip().lower()}_{voice.strip().lower()}_{CACHE_FORMAT_VERSION}"
     if speed != 1.0:
         raw += f"_speed_{format(float(speed), '.17g')}"
     if target_length != 45:

@@ -7,8 +7,8 @@ from core.cache_manager import get_cache_key
 
 
 class CacheKeyTests(unittest.TestCase):
-    def test_default_settings_keep_existing_cache_keys(self):
-        raw = "photosynthesis_hi_beginner_hf_alpha"
+    def test_cache_keys_use_presentation_generation_version(self):
+        raw = "photosynthesis_hi_beginner_hf_alpha_presentation_v2"
         expected = hashlib.md5(raw.encode("utf-8")).hexdigest()[:12]
 
         self.assertEqual(
@@ -34,6 +34,32 @@ class CacheKeyTests(unittest.TestCase):
 
 
 class LessonPlannerTests(unittest.TestCase):
+    def test_long_scene_translation_has_room_for_full_narration(self):
+        from core.planner import translate_lesson_plan
+
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {"response": "अनुवादित पाठ"}
+        plan = {
+            "title": "A lesson",
+            "level": "beginner",
+            "language": "en",
+            "scenes": [
+                {
+                    "type": "diagram",
+                    "heading": "A detailed slide",
+                    "narration": " ".join(["explanation"] * 100),
+                }
+            ],
+        }
+
+        with patch("core.planner.requests.post", return_value=response) as post:
+            translated = translate_lesson_plan(plan, "hi")
+
+        self.assertEqual(translated["scenes"][0]["narration"], "अनुवादित पाठ")
+        self.assertEqual(post.call_args.kwargs["json"]["options"]["num_predict"], 300)
+        self.assertEqual(post.call_args.kwargs["timeout"], 30)
+
     def test_translation_failure_preserves_generated_lesson(self):
         from core.planner import translate_lesson_plan
         import requests
@@ -64,8 +90,13 @@ class LessonPlannerTests(unittest.TestCase):
             "level": "intermediate",
             "language": "en",
             "scenes": [
-                {"type": "title_card", "heading": "Light to Food", "narration": "A custom explanation."},
-                {"type": "summary", "heading": "Recap", "narration": "A custom recap."},
+                {
+                    "type": "title_card" if i == 0 else "summary" if i == 10 else "diagram",
+                    "heading": f"Photosynthesis slide {i + 1}",
+                    "narration": f"Topic-specific explanation for slide {i + 1}.",
+                    "items": [{"label": "Key idea", "value": f"Slide detail {i + 1}"}],
+                }
+                for i in range(11)
             ],
         }
         response = Mock()
@@ -82,13 +113,17 @@ class LessonPlannerTests(unittest.TestCase):
 
         self.assertFalse(used_fallback)
         self.assertEqual(plan["title"], "Photosynthesis: A Custom Lesson")
+        self.assertEqual(len(plan["scenes"]), 11)
         prompt = post.call_args.kwargs["json"]["prompt"]
         self.assertIn("Learner level: intermediate", prompt)
         self.assertIn("Target video duration: 300 seconds", prompt)
-        self.assertIn("Create exactly 6 distinct scenes", prompt)
+        self.assertIn("Create exactly 11 presentation slides (scenes)", prompt)
+        self.assertIn("about 630 words of narration", prompt)
         self.assertIn("appropriate technical vocabulary", prompt)
+        self.assertIn("Do not fill the extra slides by repeating generic summaries", prompt)
+        self.assertGreaterEqual(post.call_args.kwargs["json"]["options"]["num_predict"], 3000)
 
-    def test_short_duration_requests_two_scenes_and_beginner_language(self):
+    def test_short_duration_requests_three_slides_and_beginner_language(self):
         from core.planner import generate_lesson_plan
 
         model_plan = {
@@ -97,6 +132,9 @@ class LessonPlannerTests(unittest.TestCase):
             "language": "en",
             "scenes": [
                 {"type": "title_card", "heading": "Intro", "narration": "Start simply."},
+                {"type": "diagram", "heading": "Example", "narration": "Explain simply.", "items": [
+                    {"label": "Example", "value": "A familiar example."}
+                ]},
                 {"type": "summary", "heading": "Recap", "narration": "Finish simply."},
             ],
         }
@@ -112,7 +150,7 @@ class LessonPlannerTests(unittest.TestCase):
 
         prompt = post.call_args.kwargs["json"]["prompt"]
         self.assertIn("Target video duration: 30 seconds", prompt)
-        self.assertIn("Create exactly 2 distinct scenes", prompt)
+        self.assertIn("Create exactly 3 presentation slides (scenes)", prompt)
         self.assertIn("use everyday words", prompt)
 
     def test_intermediate_level_adds_a_scene_at_short_duration(self):
@@ -124,7 +162,12 @@ class LessonPlannerTests(unittest.TestCase):
             "language": "en",
             "scenes": [
                 {"type": "title_card", "heading": "Intro", "narration": "Introduce the topic."},
-                {"type": "diagram", "heading": "Explain", "narration": "Explain the topic."},
+                {"type": "diagram", "heading": "Example", "narration": "Use a topic example.", "items": [
+                    {"label": "Example", "value": "A distinct example."}
+                ]},
+                {"type": "diagram", "heading": "Explain", "narration": "Explain the topic.", "items": [
+                    {"label": "Key idea", "value": "A distinct topic concept."}
+                ]},
                 {"type": "summary", "heading": "Recap", "narration": "Recap the topic."},
             ],
         }
@@ -138,7 +181,13 @@ class LessonPlannerTests(unittest.TestCase):
         ):
             generate_lesson_plan("Fractions", level="intermediate", target_length=30)
 
-        self.assertIn("Create exactly 3 distinct scenes", post.call_args.kwargs["json"]["prompt"])
+        self.assertIn("Create exactly 4 presentation slides (scenes)", post.call_args.kwargs["json"]["prompt"])
+
+    def test_slide_schema_allows_longer_presentations(self):
+        from core.planner import LESSON_SCHEMA
+
+        self.assertEqual(LESSON_SCHEMA["properties"]["scenes"]["minItems"], 3)
+        self.assertEqual(LESSON_SCHEMA["properties"]["scenes"]["maxItems"], 12)
 
 
 class EditSceneValidationTests(unittest.TestCase):
