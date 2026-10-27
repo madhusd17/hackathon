@@ -9,6 +9,7 @@ import uuid
 import logging
 import math
 from flask import Flask, render_template, request, jsonify, send_file, send_from_directory
+from werkzeug.exceptions import HTTPException
 from core.planner import generate_lesson_plan, translate_lesson_plan
 from core.tts_engine import tts_engine
 from core.video_renderer import export_lesson_mp4, render_scene_frame
@@ -18,6 +19,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("blu-teacher")
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+
+
+@app.errorhandler(HTTPException)
+def handle_http_error(error):
+    if request.path.startswith("/api/"):
+        return jsonify({"success": False, "error": error.description}), error.code
+    return error
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
@@ -39,12 +48,23 @@ def generate_full_lesson():
     Topic in -> Lesson Plan -> Kokoro Narration -> Synced Video & 720p MP4.
     """
     total_t0 = time.time()
-    data = request.json or {}
-    topic = data.get("topic", "How a Python loop works").strip()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Request body must be a JSON object."}), 400
+
+    raw_topic = data.get("topic", "How a Python loop works")
+    if not isinstance(raw_topic, str) or not raw_topic.strip():
+        return jsonify({"success": False, "error": "Enter a lesson topic before generating."}), 400
+    topic = raw_topic.strip()
     level = data.get("level", "beginner")
     language = data.get("language", "en")
     voice = data.get("voice", "hf_alpha")
-    speed = float(data.get("speed", 1.0))
+    try:
+        speed = float(data.get("speed", 1.0))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Speech speed must be a number."}), 400
+    if not math.isfinite(speed) or not 0.8 <= speed <= 1.3:
+        return jsonify({"success": False, "error": "Speech speed must be between 0.8x and 1.3x."}), 400
     raw_target_length = data.get("target_length", 45)
     if isinstance(raw_target_length, bool) or (
         isinstance(raw_target_length, float) and not raw_target_length.is_integer()
@@ -80,38 +100,58 @@ def generate_full_lesson():
                 }
             })
 
+    missing_tts_assets = [
+        path for path in (tts_engine.model_path, tts_engine.voices_path)
+        if not os.path.isfile(path)
+    ]
+    if missing_tts_assets:
+        return jsonify({
+            "success": False,
+            "error": (
+                "The narration model files are missing. Add the Kokoro ONNX model and "
+                f"voice file at these paths, then try again: {', '.join(missing_tts_assets)}"
+            ),
+        }), 503
+
     # Unique job output folder
     job_id = f"lesson_{uuid.uuid4().hex[:8]}"
     job_dir = os.path.join(OUTPUT_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
 
-    # 1. Lesson Planning (Ollama / Fallback)
-    plan, used_fallback, planner_s = generate_lesson_plan(
-        topic=topic,
-        level=level,
-        language=language,
-        target_length=target_length
-    )
+    try:
+        # 1. Lesson Planning (Ollama / Fallback)
+        plan, used_fallback, planner_s = generate_lesson_plan(
+            topic=topic,
+            level=level,
+            language=language,
+            target_length=target_length
+        )
 
-    # 2. Local Narration & Duration calculation (Kokoro)
-    enriched_lesson, srt_path, tts_s = tts_engine.synthesize_lesson(
-        lesson=plan,
-        output_dir=job_dir,
-        voice=voice,
-        speed=speed
-    )
+        # 2. Local Narration & Duration calculation (Kokoro)
+        enriched_lesson, srt_path, tts_s = tts_engine.synthesize_lesson(
+            lesson=plan,
+            output_dir=job_dir,
+            voice=voice,
+            speed=speed
+        )
 
-    # 3. 720p MP4 Video Assembly (Pillow + FFmpeg)
-    final_mp4_path, video_s = export_lesson_mp4(enriched_lesson, job_dir)
+        # 3. 720p MP4 Video Assembly (Pillow + FFmpeg)
+        final_mp4_path, video_s = export_lesson_mp4(enriched_lesson, job_dir)
 
-    total_s = round(time.time() - total_t0, 2)
-    enriched_lesson["job_id"] = job_id
-    enriched_lesson["voice"] = voice
-    enriched_lesson["speed"] = speed
-    enriched_lesson["used_fallback"] = used_fallback
+        total_s = round(time.time() - total_t0, 2)
+        enriched_lesson["job_id"] = job_id
+        enriched_lesson["voice"] = voice
+        enriched_lesson["speed"] = speed
+        enriched_lesson["used_fallback"] = used_fallback
 
-    # Save to Cache
-    save_to_cache(cache_key, enriched_lesson, job_dir)
+        # Save to Cache
+        save_to_cache(cache_key, enriched_lesson, job_dir)
+    except Exception as error:
+        logger.exception("Lesson generation failed for topic %r.", topic)
+        return jsonify({
+            "success": False,
+            "error": f"Lesson generation failed: {error}",
+        }), 500
 
     return jsonify({
         "success": True,

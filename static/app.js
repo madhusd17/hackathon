@@ -83,6 +83,11 @@ async function generateLesson() {
     clearTimeout(ttsTimeout);
     clearTimeout(videoTimeout);
 
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      throw new Error(`The server returned an unexpected response (HTTP ${res.status}) instead of JSON. Check the server logs.`);
+    }
+
     const data = await res.json();
     if (!data.success) {
       alert("Generation error: " + (data.error || "Unknown error"));
@@ -113,7 +118,7 @@ async function generateLesson() {
   } catch (err) {
     clearTimeout(ttsTimeout);
     clearTimeout(videoTimeout);
-    alert("Network or generation failure: " + err.message);
+    alert("Generation failed: " + err.message);
   } finally {
     generateBtn.disabled = false;
     document.getElementById("btn-text").innerText = "Generate Lesson";

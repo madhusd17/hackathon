@@ -219,6 +219,73 @@ class EditSceneValidationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("30 and 300 seconds", response.get_json()["error"])
 
+    def test_generation_pipeline_errors_are_returned_as_json(self):
+        with (
+            patch.object(
+                self.app_module,
+                "get_cache_key",
+                return_value="uncached-key",
+            ),
+            patch.object(self.app_module, "get_cached_lesson", return_value=None),
+            patch.object(
+                self.app_module,
+                "generate_lesson_plan",
+                return_value=(
+                    {
+                        "title": "A lesson",
+                        "level": "beginner",
+                        "language": "en",
+                        "scenes": [],
+                    },
+                    False,
+                    0.1,
+                ),
+            ),
+            patch("app.os.path.isfile", return_value=True),
+            patch.object(
+                self.app_module.tts_engine,
+                "synthesize_lesson",
+                side_effect=FileNotFoundError("TTS model files are missing."),
+            ),
+        ):
+            response = self.client.post(
+                "/api/generate_full_lesson",
+                json={"topic": "Test topic", "target_length": 45},
+            )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.mimetype, "application/json")
+        self.assertFalse(response.get_json()["success"])
+        self.assertIn("TTS model files are missing", response.get_json()["error"])
+
+    def test_generation_reports_missing_tts_assets_before_planning(self):
+        with (
+            patch.object(self.app_module, "get_cache_key", return_value="uncached-key"),
+            patch.object(self.app_module, "get_cached_lesson", return_value=None),
+            patch.object(self.app_module.tts_engine, "model_path", "missing-model.onnx"),
+            patch.object(self.app_module.tts_engine, "voices_path", "missing-voices.bin"),
+            patch.object(self.app_module, "generate_lesson_plan") as planner,
+        ):
+            response = self.client.post(
+                "/api/generate_full_lesson",
+                json={"topic": "Test topic", "target_length": 45},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.mimetype, "application/json")
+        self.assertIn("missing-model.onnx", response.get_json()["error"])
+        planner.assert_not_called()
+
+    def test_generation_rejects_invalid_json_body_with_json_response(self):
+        response = self.client.post(
+            "/api/generate_full_lesson",
+            data="{",
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.mimetype, "application/json")
+
 
 class TopicDiversityTests(unittest.TestCase):
     def test_curated_topics_produce_distinct_content(self):
