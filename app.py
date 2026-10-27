@@ -84,23 +84,29 @@ def generate_full_lesson():
     if not force_refresh:
         cached = get_cached_lesson(cache_key)
         if cached:
-            cached_dir = os.path.join(CACHE_DIR, cache_key)
-            return jsonify({
-                "success": True,
-                "cached": True,
-                "lesson": cached,
-                "folder": f"cache/{cache_key}",
-                "metrics": {
-                    "planner_s": 0.01,
-                    "tts_s": 0.01,
-                    "video_s": 0.01,
-                    "total_s": round(time.time() - total_t0, 2),
-                    "used_fallback": bool(cached.get("used_fallback", False)),
-                    "translation_warning": cached.get("translation_warning"),
-                    "target_duration": cached.get("target_duration", target_length),
-                    "actual_duration": cached.get("total_duration", 0)
-                }
-            })
+            cached_topic = " ".join(str(cached.get("topic", "")).split()).casefold()
+            if cached_topic == " ".join(topic.split()).casefold():
+                return jsonify({
+                    "success": True,
+                    "cached": True,
+                    "lesson": cached,
+                    "folder": f"cache/{cache_key}",
+                    "metrics": {
+                        "planner_s": 0.01,
+                        "tts_s": 0.01,
+                        "video_s": 0.01,
+                        "total_s": round(time.time() - total_t0, 2),
+                        "used_fallback": bool(cached.get("used_fallback", False)),
+                        "translation_warning": cached.get("translation_warning"),
+                        "target_duration": cached.get("target_duration", target_length),
+                        "actual_duration": cached.get("total_duration", 0)
+                    }
+                })
+            logger.warning(
+                "Ignoring cache entry %s because its topic does not match request %r.",
+                cache_key,
+                topic,
+            )
 
     missing_tts_assets = [
         path for path in (tts_engine.model_path, tts_engine.voices_path)

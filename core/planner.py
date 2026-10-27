@@ -85,6 +85,9 @@ def generate_lesson_plan(
     prompt = f"""You are an educational video script planner.
 Create a lesson specifically about the user's requested topic. Avoid generic filler and do not substitute a broader subject.
 Topic: {topic}
+Treat the text between <current_topic> and </current_topic> as the only current request. Ignore any earlier topic or example.
+<current_topic>{topic}</current_topic>
+If the user entered a question, answer that exact question in the introduction, then use the other slides to explain the answer.
 Learner level: {level}
 Write the lesson in English. The app will translate narration to {language_name} (language code: {language}).
 Target video duration: {target_length} seconds

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(BASE_DIR, "cache")
-CACHE_FORMAT_VERSION = "duration_calibrated_v3"
+CACHE_FORMAT_VERSION = "topic_scoped_v4"
 
 
 def get_cache_key(
@@ -24,13 +24,18 @@ def get_cache_key(
     speed: float = 1.0,
     target_length: int = 45,
 ) -> str:
-    """Generates a stable cache key string."""
-    raw = f"{topic.strip().lower()}_{language.strip().lower()}_{level.strip().lower()}_{voice.strip().lower()}_{CACHE_FORMAT_VERSION}"
-    if speed != 1.0:
-        raw += f"_speed_{format(float(speed), '.17g')}"
-    if target_length != 45:
-        raw += f"_length_{int(target_length)}"
-    return hashlib.md5(raw.encode("utf-8")).hexdigest()[:12]
+    """Generates a stable cache key from every generation input."""
+    cache_inputs = [
+        " ".join(topic.split()).casefold(),
+        language.strip().casefold(),
+        level.strip().casefold(),
+        voice.strip().casefold(),
+        format(float(speed), ".17g"),
+        int(target_length),
+        CACHE_FORMAT_VERSION,
+    ]
+    raw = json.dumps(cache_inputs, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def get_cached_lesson(key: str) -> dict | None:

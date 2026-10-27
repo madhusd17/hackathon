@@ -12,9 +12,21 @@ from core.cache_manager import get_cache_key
 
 
 class CacheKeyTests(unittest.TestCase):
-    def test_cache_keys_use_presentation_generation_version(self):
-        raw = "photosynthesis_hi_beginner_hf_alpha_duration_calibrated_v3"
-        expected = hashlib.md5(raw.encode("utf-8")).hexdigest()[:12]
+    def test_cache_keys_use_all_inputs_and_topic_scoped_version(self):
+        raw = json.dumps(
+            [
+                "photosynthesis",
+                "hi",
+                "beginner",
+                "hf_alpha",
+                "1",
+                45,
+                "topic_scoped_v4",
+            ],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        expected = hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
         self.assertEqual(
             get_cache_key("Photosynthesis", "hi", "beginner"),
@@ -36,9 +48,45 @@ class CacheKeyTests(unittest.TestCase):
             get_cache_key("Photosynthesis", "hi", "beginner", speed=1.2),
             get_cache_key("Photosynthesis", "hi", "beginner", speed=1.2),
         )
+        self.assertNotEqual(
+            get_cache_key("Explain recursion", "en", "beginner"),
+            get_cache_key("Explain linked lists", "en", "beginner"),
+        )
+        self.assertNotEqual(
+            get_cache_key("a_b", "en", "beginner"),
+            get_cache_key("a", "b_en", "beginner"),
+        )
 
 
 class LessonPlannerTests(unittest.TestCase):
+    def test_valid_model_answer_is_not_replaced_by_topic_keyword_fallback(self):
+        from core.planner import generate_lesson_plan
+
+        model_plan = {
+            "title": "Why Snowflakes Have Six Sides",
+            "level": "beginner",
+            "language": "en",
+            "scenes": [
+                {"type": "title_card", "heading": "A frozen crystal", "narration": "Water molecules form a crystal."},
+                {"type": "diagram", "heading": "The repeating pattern", "narration": "The molecule bonds repeat in six directions.", "items": [
+                    {"label": "Shape", "value": "A six-sided pattern"}
+                ]},
+                {"type": "summary", "heading": "The result", "narration": "This pattern gives each snowflake six sides."},
+            ],
+        }
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {"response": json.dumps(model_plan)}
+
+        with patch("core.planner.requests.post", return_value=response):
+            plan, used_fallback, _ = generate_lesson_plan(
+                "Why do snowflakes have six sides?", target_length=45
+            )
+
+        self.assertFalse(used_fallback)
+        self.assertEqual(plan["title"], model_plan["title"])
+        self.assertEqual(plan["topic"], "Why do snowflakes have six sides?")
+
     def test_long_scene_translation_has_room_for_full_narration(self):
         from core.planner import translate_lesson_plan
 
@@ -122,6 +170,7 @@ class LessonPlannerTests(unittest.TestCase):
         self.assertEqual(len(plan["scenes"]), 11)
         prompt = post.call_args.kwargs["json"]["prompt"]
         self.assertIn("Learner level: intermediate", prompt)
+        self.assertIn("answer that exact question in the introduction", prompt)
         self.assertIn("Target video duration: 300 seconds", prompt)
         self.assertIn("Narration speed: 1.2x", prompt)
         self.assertIn("Create exactly 11 presentation slides (scenes)", prompt)
@@ -312,7 +361,11 @@ class EditSceneValidationTests(unittest.TestCase):
     def test_generation_includes_speed_and_length_in_cache_lookup(self):
         with (
             patch.object(self.app_module, "get_cache_key", return_value="cache-key") as key_builder,
-            patch.object(self.app_module, "get_cached_lesson", return_value={"scenes": []}),
+            patch.object(
+                self.app_module,
+                "get_cached_lesson",
+                return_value={"topic": "Photosynthesis", "scenes": []},
+            ),
         ):
             response = self.client.post(
                 "/api/generate_full_lesson",
@@ -329,6 +382,24 @@ class EditSceneValidationTests(unittest.TestCase):
         key_builder.assert_called_once_with(
             "Photosynthesis", "hi", "beginner", "hf_alpha", 1.2, 30
         )
+
+    def test_generation_ignores_cache_entry_for_different_topic(self):
+        with (
+            patch.object(self.app_module, "get_cache_key", return_value="cache-key"),
+            patch.object(
+                self.app_module,
+                "get_cached_lesson",
+                return_value={"topic": "Photosynthesis", "scenes": []},
+            ),
+            patch("app.os.path.isfile", return_value=False),
+        ):
+            response = self.client.post(
+                "/api/generate_full_lesson",
+                json={"topic": "Docker Networking", "target_length": 45},
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertIn("model files are missing", response.get_json()["error"])
 
     def test_generation_rejects_duration_outside_supported_range(self):
         response = self.client.post(

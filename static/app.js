@@ -37,6 +37,11 @@ async function generateLesson() {
 
   if (!topic) return;
 
+  currentLesson = null;
+  audioPlayer.pause();
+  document.getElementById("mp4-video").pause();
+  document.getElementById("player-section").classList.add("hidden");
+
   // Show status indicator
   const statusCard = document.getElementById("generation-status");
   const statusTitle = document.getElementById("status-title");
@@ -92,6 +97,11 @@ async function generateLesson() {
     if (!data.success) {
       alert("Generation error: " + (data.error || "Unknown error"));
       return;
+    }
+    const requestedTopic = topic.replace(/\s+/g, " ").toLocaleLowerCase();
+    const returnedTopic = String(data.lesson?.topic || "").replace(/\s+/g, " ").toLocaleLowerCase();
+    if (returnedTopic !== requestedTopic) {
+      throw new Error("The server returned a lesson for a different topic. Please generate it again.");
     }
 
     progressFill.style.width = "100%";
