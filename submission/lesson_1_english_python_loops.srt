@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:05,684
+A loop repeats an instruction for each item in a sequence, saving time and code.
+
+2
+00:00:05,684 --> 00:00:11,176
+The for loop iterates through range of three, taking values zero, one, and two.
+
+3
+00:00:11,176 --> 00:00:17,457
+In each pass, the variable i takes the next value and executes the indented print block.
+
+4
+00:00:17,457 --> 00:00:24,037
+Remember that range of three starts from zero and stops before three, so the final number is two.

@@ -1,0 +1,15 @@
+# Virtual Environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Heavy weights (documented in README with download instructions)
+models/*.onnx
+models/*.bin
+
+# Temporary output caches
+cache/
+output/
+test_pipeline/
+*.crdownload

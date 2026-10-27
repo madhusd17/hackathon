@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blu Visual Teacher — Offline Visual Lesson Engine</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+</head>
+<body>
+  <!-- Header -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <div class="logo-icon">🎬</div>
+        <div class="brand-text">
+          <h1>Blu Visual Teacher</h1>
+          <span class="tagline">Local-First Animated Explainer Engine</span>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge offline-badge">
+          <span class="dot green-dot"></span> 100% Offline & Local
+        </span>
+        <span class="badge cpu-badge">
+          <span class="dot blue-dot"></span> CPU-Optimized (Kokoro + Qwen)
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <!-- Top Configuration Grid -->
+    <section class="card input-card">
+      <div class="card-header">
+        <h2>1. Concept Input & Parameters</h2>
+        <span class="step-tag">Stage 1</span>
+      </div>
+
+      <form id="lesson-form" onsubmit="event.preventDefault(); generateLesson();">
+        <div class="form-group">
+          <label for="topic-input">Lesson Topic or Concept:</label>
+          <div class="input-with-button">
+            <input type="text" id="topic-input" placeholder="e.g. How does a Python loop work? or Photosynthesis" required value="How a Python loop works">
+          </div>
+          <div class="topic-chips">
+            <span class="chip" onclick="setTopic('How a Python loop works')">Python Loops</span>
+            <span class="chip" onclick="setTopic('Understanding Photosynthesis')">Photosynthesis</span>
+            <span class="chip" onclick="setTopic('Newton\'s Third Law of Motion')">Newton's 3rd Law</span>
+            <span class="chip" onclick="setTopic('Binary Search Algorithm')">Binary Search</span>
+            <span class="chip" onclick="setTopic('Chemical Reaction Basics')">Chemical Reaction</span>
+          </div>
+        </div>
+
+        <div class="form-grid-3">
+          <div class="form-group">
+            <label for="lang-select">Narration Language:</label>
+            <select id="lang-select">
+              <option value="en" selected>English (Indian Accent)</option>
+              <option value="hi">Hindi (हिन्दी - देवनागरी)</option>
+              <option value="ta">Tamil (தமிழ்)</option>
+              <option value="te">Telugu (తెలుగు)</option>
+              <option value="mr">Marathi (मराठी)</option>
+              <option value="bn">Bengali (বাংলা)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="voice-select">Voice Model:</label>
+            <select id="voice-select">
+              <option value="hf_alpha" selected>Female (hf_alpha - Natural Indian)</option>
+              <option value="hm_omega">Male (hm_omega - Clear Indian)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="level-select">Learner Level:</label>
+            <select id="level-select">
+              <option value="beginner" selected>Beginner</option>
+              <option value="intermediate">Intermediate</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row flex-between">
+          <div class="speed-control">
+            <label for="speed-slider">Speech Speed: <span id="speed-val">1.0x</span></label>
+            <input type="range" id="speed-slider" min="0.8" max="1.3" step="0.05" value="1.0" oninput="document.getElementById('speed-val').innerText = this.value + 'x'">
+          </div>
+
+          <div class="cta-actions">
+            <label class="checkbox-label">
+              <input type="checkbox" id="force-refresh"> Bypass Cache
+            </label>
+            <button type="submit" id="generate-btn" class="btn primary-btn">
+              <span id="btn-icon">⚡</span> <span id="btn-text">Generate Lesson</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- Generation Status Bar -->
+    <div id="generation-status" class="generation-card hidden">
+      <div class="status-header">
+        <div class="spinner"></div>
+        <div class="status-info">
+          <h3 id="status-title">Generating Lesson Plan...</h3>
+          <p id="status-desc">Local LLM (Qwen 2.5 3B) is structuring scenes & schema...</p>
+        </div>
+      </div>
+      <div class="progress-track">
+        <div id="progress-bar-fill" class="progress-bar-fill"></div>
+      </div>
+    </div>
+
+    <!-- Execution Timing Breakdown (Bonus Feature) -->
+    <div id="metrics-bar" class="metrics-container hidden">
+      <div class="metric-pill"><span class="m-label">Planner (LLM):</span> <strong id="m-planner">0.0s</strong></div>
+      <div class="metric-pill"><span class="m-label">Voice (Kokoro):</span> <strong id="m-tts">0.0s</strong></div>
+      <div class="metric-pill"><span class="m-label">Video (FFmpeg):</span> <strong id="m-video">0.0s</strong></div>
+      <div class="metric-pill total"><span class="m-label">Total Time:</span> <strong id="m-total">0.0s</strong></div>
+      <span id="cached-badge" class="badge cached-badge hidden">⚡ Loaded from Local Cache</span>
+    </div>
+
+    <!-- Video & Visual Player Section (Stage 3 & 4) -->
+    <section id="player-section" class="card player-card hidden">
+      <div class="card-header player-header">
+        <div>
+          <h2 id="lesson-display-title">Lesson Title</h2>
+          <span id="lesson-sub-meta" class="meta-tag">Beginner • English</span>
+        </div>
+
+        <div class="view-toggles">
+          <button class="toggle-btn active" id="btn-view-interactive" onclick="switchView('interactive')">Interactive Engine</button>
+          <button class="toggle-btn" id="btn-view-mp4" onclick="switchView('mp4')">Exported 720p MP4</button>
+        </div>
+      </div>
+
+      <!-- Player Frame 16:9 -->
+      <div class="player-wrapper">
+        <!-- Interactive Canvas View -->
+        <div id="interactive-stage" class="stage-frame">
+          <!-- Top Bar inside Stage -->
+          <div class="stage-topbar">
+            <span class="stage-brand">Blu Visual Teacher</span>
+            <span id="stage-topic-badge" class="stage-badge">Concept Walkthrough</span>
+            <span id="stage-step-badge" class="stage-step">Scene 1 of 3</span>
+          </div>
+
+          <!-- Dynamic Scene Content Area -->
+          <div id="scene-container" class="scene-container">
+            <!-- Injected via JavaScript based on scene type -->
+          </div>
+
+          <!-- Caption Bar at Bottom of Stage -->
+          <div class="caption-bar">
+            <span class="mic-icon">🎙️</span>
+            <div id="caption-text" class="caption-text">Narration audio and captions will appear here...</div>
+          </div>
+        </div>
+
+        <!-- Rendered MP4 Video View -->
+        <div id="mp4-stage" class="stage-frame hidden">
+          <video id="mp4-video" controls width="100%" height="100%" preload="auto">
+            <source id="mp4-source" src="" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      </div>
+
+      <!-- Synchronized Audio Element (Hidden for Interactive Mode) -->
+      <audio id="scene-audio" preload="auto"></audio>
+
+      <!-- Player Controls Bar -->
+      <div class="controls-bar">
+        <div class="controls-left">
+          <button class="control-btn" id="play-pause-btn" onclick="togglePlayPause()" title="Play / Pause">▶️ Play</button>
+          <button class="control-btn" onclick="prevScene()" title="Previous Scene">⏮ Prev</button>
+          <button class="control-btn" onclick="nextScene()" title="Next Scene">Next ⏭</button>
+          <button class="control-btn" onclick="replayLesson()" title="Replay">🔄 Replay</button>
+          <span class="time-display" id="time-display">0:00 / 0:00</span>
+        </div>
+
+        <div class="scrub-container">
+          <div class="progress-scrub-track" id="scrub-track" onclick="handleScrub(event)">
+            <div class="progress-scrub-fill" id="scrub-fill"></div>
+            <!-- Scene marker dots dynamically added -->
+            <div id="scene-markers" class="markers-layer"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action & Export Toolbar (Stage 5 + Bonus Points) -->
+      <div class="toolbar-grid">
+        <!-- Export Group -->
+        <div class="tool-group">
+          <h3>Download & Export</h3>
+          <div class="tool-buttons">
+            <a id="download-mp4-btn" href="#" class="btn export-btn" download>
+              📥 Download 720p MP4
+            </a>
+            <a id="download-srt-btn" href="#" class="btn secondary-btn" download>
+              📄 Download Captions (.srt)
+            </a>
+          </div>
+        </div>
+
+        <!-- Re-Voice Group (Bonus) -->
+        <div class="tool-group">
+          <h3>Re-Voice in Another Language (Instant)</h3>
+          <div class="revoice-row">
+            <select id="revoice-lang-select">
+              <option value="hi">Hindi (हिन्दी)</option>
+              <option value="ta">Tamil (தமிழ்)</option>
+              <option value="te">Telugu (తెలుగు)</option>
+              <option value="mr">Marathi (मराठी)</option>
+              <option value="bn">Bengali (বাংলা)</option>
+              <option value="en">English (Indian Accent)</option>
+            </select>
+            <button class="btn secondary-btn" onclick="revoiceCurrentLesson()">
+              🗣️ Re-Voice
+            </button>
+          </div>
+        </div>
+
+        <!-- Teacher Edit Mode (Bonus) -->
+        <div class="tool-group">
+          <h3>Teacher Control</h3>
+          <button class="btn edit-btn" onclick="openTeacherEditor()">
+            ✏️ Edit Scenes Before Render
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Teacher Edit Modal (Bonus Feature) -->
+    <div id="edit-modal" class="modal-backdrop hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Teacher Scene Editor</h3>
+          <button class="close-btn" onclick="closeTeacherEditor()">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="scene-tabs" id="edit-scene-tabs"></div>
+          <div id="edit-scene-form" class="edit-scene-form">
+            <div class="form-group">
+              <label>Scene Heading:</label>
+              <input type="text" id="edit-heading">
+            </div>
+            <div class="form-group" id="edit-code-group">
+              <label>Code Walkthrough Content:</label>
+              <textarea id="edit-code" rows="4"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Narration Text (Speech):</label>
+              <textarea id="edit-narration" rows="3"></textarea>
+            </div>
+            <button class="btn primary-btn" onclick="saveAndRegenerateScene()">Save & Regenerate Scene Audio</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cached Lessons Drawer (Bonus Feature) -->
+    <section class="card cache-library-card">
+      <div class="card-header">
+        <h2>Saved & Cached Lessons</h2>
+        <span class="step-tag">Instant Replay</span>
+      </div>
+      <div id="cache-list" class="cache-list">
+        <!-- Injected via JavaScript -->
+        <p class="placeholder-text">No cached lessons yet. Generate one above!</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Blu Visual Teacher • Built for the 24-Hour Hackathon • 100% Local-First Engine</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
+
