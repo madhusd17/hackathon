@@ -145,8 +145,11 @@ function loadLessonIntoPlayer(lesson, folder) {
   // Set MP4 source
   const mp4Video = document.getElementById("mp4-video");
   const mp4Source = document.getElementById("mp4-source");
-  const mp4Url = `/media/${folder}/lesson.mp4`;
-  mp4Source.src = mp4Url;
+  const mp4Url = `/media/${folder}/lesson.mp4?t=${Date.now()}`;
+  if (mp4Source) mp4Source.src = mp4Url;
+  mp4Video.src = mp4Url;
+  mp4Video.muted = false;
+  mp4Video.volume = 1.0;
   mp4Video.load();
 
   // Set Download Links
@@ -334,7 +337,8 @@ function renderScene(idx) {
 
   // Load Audio for this scene
   const audioFile = scene.audio_file || `scene_${idx}.wav`;
-  audioPlayer.src = `/media/${currentFolder}/${audioFile}`;
+  audioPlayer.src = `/media/${currentFolder}/${audioFile}?t=${Date.now()}`;
+  audioPlayer.volume = 1.0;
 
   updateTimeDisplay();
 }
@@ -484,6 +488,8 @@ function switchView(mode) {
     btnInteractive.classList.remove("active");
     btnMp4.classList.add("active");
     pause(); // pause interactive audio
+    mp4Video.muted = false;
+    mp4Video.volume = 1.0;
     mp4Video.play().catch(e => console.log(e));
   }
 }

@@ -365,6 +365,7 @@ def export_lesson_mp4(lesson: dict, output_dir: str) -> tuple[str, float]:
         "-f", "concat", "-safe", "0",
         "-i", list_filename,
         "-c", "copy",
+        "-movflags", "+faststart",
         final_mp4_name
     ]
     subprocess.run(concat_cmd, check=True, cwd=output_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

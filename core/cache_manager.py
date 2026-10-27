@@ -42,6 +42,13 @@ def get_cached_lesson(key: str) -> dict | None:
         try:
             with open(plan_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
+
+            # Guard against dummy / silent audio cached from previous failed runs
+            scenes = data.get("scenes", [])
+            if scenes and all(abs(s.get("duration", 0) - 3.5) < 0.01 for s in scenes):
+                logger.warning(f"Cache entry {key} has dummy/silent audio, ignoring cache.")
+                return None
+
             data["cached"] = True
             data["cache_key"] = key
             return data

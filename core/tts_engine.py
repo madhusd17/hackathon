@@ -35,6 +35,39 @@ VOICE_MAP = {
 }
 
 
+# Ensure kokoro_onnx passes speed as float32 in all environments (fixes stock PyPI np.int32 bug)
+def _patch_kokoro_speed_dtype():
+    try:
+        import inspect
+        src = inspect.getsource(kokoro_onnx.Kokoro._create_audio)
+        if "np.int32" in src:
+            def patched_create_audio(self, phonemes, voice, speed):
+                tokens = np.array(self.tokenizer.tokenize(phonemes), dtype=np.int64)
+                assert len(tokens) <= kokoro_onnx.MAX_PHONEME_LENGTH
+                voice_data = voice[len(tokens)]
+                tokens = [[0, *tokens, 0]]
+                if "input_ids" in [i.name for i in self.sess.get_inputs()]:
+                    inputs = {
+                        "input_ids": tokens,
+                        "style": np.array(voice_data, dtype=np.float32),
+                        "speed": np.array([speed], dtype=np.float32),
+                    }
+                else:
+                    inputs = {
+                        "tokens": tokens,
+                        "style": voice_data,
+                        "speed": np.ones(1, dtype=np.float32) * speed,
+                    }
+                audio = self.sess.run(None, inputs)[0]
+                return audio, kokoro_onnx.SAMPLE_RATE
+            kokoro_onnx.Kokoro._create_audio = patched_create_audio
+            logger.info("Auto-patched kokoro_onnx._create_audio with float32 speed tensor.")
+    except Exception as e:
+        logger.warning(f"Could not check/patch kokoro_onnx: {e}")
+
+_patch_kokoro_speed_dtype()
+
+
 class TTSEngine:
     def __init__(self, model_path: str = MODEL_PATH, voices_path: str = VOICES_PATH):
         self.model_path = model_path
