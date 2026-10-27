@@ -8,7 +8,7 @@ from core.cache_manager import get_cache_key
 
 class CacheKeyTests(unittest.TestCase):
     def test_cache_keys_use_presentation_generation_version(self):
-        raw = "photosynthesis_hi_beginner_hf_alpha_presentation_v2"
+        raw = "photosynthesis_hi_beginner_hf_alpha_duration_calibrated_v3"
         expected = hashlib.md5(raw.encode("utf-8")).hexdigest()[:12]
 
         self.assertEqual(
@@ -39,7 +39,7 @@ class LessonPlannerTests(unittest.TestCase):
 
         response = Mock()
         response.status_code = 200
-        response.json.return_value = {"response": "अनुवादित पाठ"}
+        response.json.return_value = {"response": json.dumps(["अनुवादित पाठ"], ensure_ascii=False)}
         plan = {
             "title": "A lesson",
             "level": "beginner",
@@ -57,8 +57,9 @@ class LessonPlannerTests(unittest.TestCase):
             translated = translate_lesson_plan(plan, "hi")
 
         self.assertEqual(translated["scenes"][0]["narration"], "अनुवादित पाठ")
-        self.assertEqual(post.call_args.kwargs["json"]["options"]["num_predict"], 300)
-        self.assertEqual(post.call_args.kwargs["timeout"], 30)
+        self.assertEqual(post.call_args.kwargs["json"]["options"]["num_predict"], 500)
+        self.assertEqual(post.call_args.kwargs["timeout"], 60)
+        self.assertIn("same order", post.call_args.kwargs["json"]["prompt"])
 
     def test_translation_failure_preserves_generated_lesson(self):
         from core.planner import translate_lesson_plan
@@ -108,7 +109,7 @@ class LessonPlannerTests(unittest.TestCase):
             patch("core.planner.translate_lesson_plan", side_effect=lambda plan, language: plan),
         ):
             plan, used_fallback, _ = generate_lesson_plan(
-                "Photosynthesis", level="intermediate", target_length=300
+                "Photosynthesis", level="intermediate", target_length=300, speed=1.2
             )
 
         self.assertFalse(used_fallback)
@@ -117,11 +118,15 @@ class LessonPlannerTests(unittest.TestCase):
         prompt = post.call_args.kwargs["json"]["prompt"]
         self.assertIn("Learner level: intermediate", prompt)
         self.assertIn("Target video duration: 300 seconds", prompt)
+        self.assertIn("Narration speed: 1.2x", prompt)
         self.assertIn("Create exactly 11 presentation slides (scenes)", prompt)
-        self.assertIn("about 630 words of narration", prompt)
+        self.assertIn("about 884 spoken words", prompt)
         self.assertIn("appropriate technical vocabulary", prompt)
         self.assertIn("Do not fill the extra slides by repeating generic summaries", prompt)
-        self.assertGreaterEqual(post.call_args.kwargs["json"]["options"]["num_predict"], 3000)
+        self.assertEqual(post.call_args.kwargs["json"]["options"]["num_predict"], 2400)
+        schema = post.call_args.kwargs["json"]["format"]
+        self.assertEqual(schema["properties"]["scenes"]["minItems"], 11)
+        self.assertEqual(schema["properties"]["scenes"]["maxItems"], 11)
 
     def test_short_duration_requests_three_slides_and_beginner_language(self):
         from core.planner import generate_lesson_plan

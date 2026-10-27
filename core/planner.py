@@ -7,6 +7,7 @@ Enforces JSON Schema validation and seamlessly falls back to pre-built lessons s
 import json
 import logging
 import time
+from copy import deepcopy
 import requests
 from jsonschema import validate
 from core.fallbacks import get_fallback_lesson
@@ -48,7 +49,13 @@ LESSON_SCHEMA = {
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL_NAME = "qwen2.5:3b"
 
-def generate_lesson_plan(topic: str, level: str = "beginner", language: str = "en", target_length: int = 45) -> tuple[dict, bool, float]:
+def generate_lesson_plan(
+    topic: str,
+    level: str = "beginner",
+    language: str = "en",
+    target_length: int = 45,
+    speed: float = 1.0,
+) -> tuple[dict, bool, float]:
     """
     Generates a lesson plan matching the hackathon schema.
     Returns: (lesson_json, used_fallback, elapsed_seconds)
@@ -59,7 +66,13 @@ def generate_lesson_plan(topic: str, level: str = "beginner", language: str = "e
     base_scene_count = max(3, min(10, (target_length + 29) // 30))
     level_scene_bonus = 1 if level == "intermediate" else 0
     num_scenes = min(12, base_scene_count + level_scene_bonus)
-    target_words = max(65, round(target_length * 2.1))
+    target_words = max(
+        40,
+        round((target_length - num_scenes * 0.5) * 2.5 * speed),
+    )
+    generation_schema = deepcopy(LESSON_SCHEMA)
+    generation_schema["properties"]["scenes"]["minItems"] = num_scenes
+    generation_schema["properties"]["scenes"]["maxItems"] = num_scenes
     language_names = {
         "en": "English",
         "hi": "Hindi",
@@ -75,7 +88,8 @@ Topic: {topic}
 Learner level: {level}
 Write the lesson in English. The app will translate narration to {language_name} (language code: {language}).
 Target video duration: {target_length} seconds
-Create exactly {num_scenes} presentation slides (scenes) and about {target_words} words of narration in total.
+Narration speed: {speed}x
+Create exactly {num_scenes} presentation slides (scenes). Aim for about {target_words} spoken words in total, distributed evenly across the slides. Do not write a short summary in place of the requested narration.
 
 Treat the scenes as a complete slide presentation. Give every slide a clear, specific heading, useful on-slide visual content, and narration that explains that slide. Use diagram scenes with 2-4 concise, topic-specific items to teach concepts; use code_walkthrough scenes with valid code and highlight_lines for programming; include concrete examples, applications, or a quiz when appropriate. Reserve the first slide for the introduction and the last slide for a recap. Do not fill the extra slides by repeating generic summaries.
 
@@ -93,15 +107,15 @@ Use only scene types title_card, diagram, code_walkthrough, quiz, and summary. I
                 "model": MODEL_NAME,
                 "prompt": prompt,
                 "stream": False,
-                "format": "json",
+                "format": generation_schema,
                 "options": {
                     "temperature": 0.35,
-                    "num_predict": max(1400, min(4096, target_words * 5)),
+                    "num_predict": max(900, min(2400, target_words * 3)),
                     "num_thread": 4,
-                    "num_ctx": 8192
+                    "num_ctx": 4096
                 }
             },
-            timeout=120
+            timeout=75
         )
         if response.status_code == 200:
             raw_text = response.json().get("response", "").strip()
@@ -114,6 +128,10 @@ Use only scene types title_card, diagram, code_walkthrough, quiz, and summary. I
 
             # Schema validation
             validate(instance=plan, schema=LESSON_SCHEMA)
+            if len(plan["scenes"]) != num_scenes:
+                raise ValueError(
+                    f"Expected {num_scenes} slides, received {len(plan['scenes'])}."
+                )
             plan["topic"] = topic
             
             # If target language is non-English, handle translation
@@ -147,38 +165,42 @@ def translate_lesson_plan(plan: dict, target_lang: str) -> dict:
     if not target_name:
         return plan
 
-    # Attempt fast sentence-by-sentence translation
+    # Translate narration for all scenes together to avoid one model call per slide.
     try:
-        translated_scenes = []
-        for sc in plan.get("scenes", []):
-            sc_copy = dict(sc)
-            narration = sc.get("narration", "")
-            # Fast translate narration
-            trans_prompt = f"Translate to {target_name} script only (keep code/technical terms in English, no explanation):\n{narration}"
-            res = requests.post(
-                OLLAMA_URL,
-                json={
-                    "model": MODEL_NAME,
-                    "prompt": trans_prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.1,
-                        "num_predict": max(180, min(400, len(narration.split()) * 3)),
-                        "num_thread": 4,
-                        "num_ctx": 1024,
-                    }
+        narrations = [scene.get("narration", "") for scene in plan.get("scenes", [])]
+        trans_prompt = (
+            f"Translate each string into {target_name}. Keep technical terms in English. "
+            "Return only a JSON array of translated strings in the same order and with the same length.\n"
+            f"{json.dumps(narrations, ensure_ascii=False)}"
+        )
+        response = requests.post(
+            OLLAMA_URL,
+            json={
+                "model": MODEL_NAME,
+                "prompt": trans_prompt,
+                "stream": False,
+                "format": "json",
+                "options": {
+                    "temperature": 0.1,
+                    "num_predict": max(500, min(2400, sum(len(text.split()) for text in narrations) * 4)),
+                    "num_thread": 4,
+                    "num_ctx": 4096,
                 },
-                timeout=30
-            )
-            res.raise_for_status()
-            if res.status_code == 200:
-                translated_text = res.json().get("response", "").strip()
-                if not translated_text:
-                    raise ValueError("Translation returned empty narration.")
-                sc_copy["narration"] = translated_text
-            translated_scenes.append(sc_copy)
-            
-        plan["scenes"] = translated_scenes
+            },
+            timeout=60,
+        )
+        response.raise_for_status()
+        translated_narrations = json.loads(response.json().get("response", ""))
+        if (
+            not isinstance(translated_narrations, list)
+            or len(translated_narrations) != len(narrations)
+            or not all(isinstance(text, str) and text.strip() for text in translated_narrations)
+        ):
+            raise ValueError("Translation did not return one non-empty string per scene.")
+
+        for scene, narration in zip(plan.get("scenes", []), translated_narrations):
+            scene["narration"] = narration.strip()
+
         plan["language"] = target_lang
         return plan
     except Exception as e:

@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(BASE_DIR, "cache")
-CACHE_FORMAT_VERSION = "presentation_v2"
+CACHE_FORMAT_VERSION = "duration_calibrated_v3"
 
 
 def get_cache_key(

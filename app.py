@@ -96,7 +96,9 @@ def generate_full_lesson():
                     "video_s": 0.01,
                     "total_s": round(time.time() - total_t0, 2),
                     "used_fallback": bool(cached.get("used_fallback", False)),
-                    "translation_warning": cached.get("translation_warning")
+                    "translation_warning": cached.get("translation_warning"),
+                    "target_duration": cached.get("target_duration", target_length),
+                    "actual_duration": cached.get("total_duration", 0)
                 }
             })
 
@@ -124,7 +126,8 @@ def generate_full_lesson():
             topic=topic,
             level=level,
             language=language,
-            target_length=target_length
+            target_length=target_length,
+            speed=speed
         )
 
         # 2. Local Narration & Duration calculation (Kokoro)
@@ -142,6 +145,7 @@ def generate_full_lesson():
         enriched_lesson["job_id"] = job_id
         enriched_lesson["voice"] = voice
         enriched_lesson["speed"] = speed
+        enriched_lesson["target_duration"] = target_length
         enriched_lesson["used_fallback"] = used_fallback
 
         # Save to Cache
@@ -164,7 +168,9 @@ def generate_full_lesson():
             "video_s": round(video_s, 2),
             "total_s": total_s,
             "used_fallback": used_fallback,
-            "translation_warning": enriched_lesson.get("translation_warning")
+            "translation_warning": enriched_lesson.get("translation_warning"),
+            "target_duration": target_length,
+            "actual_duration": enriched_lesson.get("total_duration", 0)
         }
     })
 

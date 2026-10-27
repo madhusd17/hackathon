@@ -161,7 +161,10 @@ function loadLessonIntoPlayer(lesson, folder) {
   document.getElementById("lesson-display-title").innerText = lesson.title || "Visual Lesson";
   const langNames = { en: "English", hi: "Hindi", ta: "Tamil", te: "Telugu", mr: "Marathi", bn: "Bengali" };
   const langLabel = langNames[lesson.language] || lesson.language.toUpperCase();
-  document.getElementById("lesson-sub-meta").innerText = `${lesson.level || "Beginner"} • ${langLabel} • ${lesson.scenes.length} Scenes`;
+  const actualDuration = formatDuration(lesson.total_duration || 0);
+  const targetDuration = formatDuration(lesson.target_duration || lesson.total_duration || 0);
+  document.getElementById("lesson-sub-meta").innerText =
+    `${lesson.level || "Beginner"} • ${langLabel} • ${lesson.scenes.length} Scenes • ${actualDuration} / ${targetDuration} target`;
 
   // Set MP4 source
   const mp4Video = document.getElementById("mp4-video");
@@ -203,6 +206,12 @@ function createScrubMarkers(scenes, totalDur) {
       markersContainer.appendChild(marker);
     }
   });
+}
+
+function formatDuration(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const remaining = Math.floor(seconds % 60);
+  return `${mins}:${String(remaining).padStart(2, "0")}`;
 }
 
 // ----------------------------------------------------
