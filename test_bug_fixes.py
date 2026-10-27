@@ -1,7 +1,12 @@
 import hashlib
 import json
+import os
+import tempfile
 import unittest
 from unittest.mock import Mock, patch
+
+import numpy as np
+import soundfile as sf
 
 from core.cache_manager import get_cache_key
 
@@ -58,7 +63,7 @@ class LessonPlannerTests(unittest.TestCase):
 
         self.assertEqual(translated["scenes"][0]["narration"], "अनुवादित पाठ")
         self.assertEqual(post.call_args.kwargs["json"]["options"]["num_predict"], 500)
-        self.assertEqual(post.call_args.kwargs["timeout"], 60)
+        self.assertEqual(post.call_args.kwargs["timeout"], 20)
         self.assertIn("same order", post.call_args.kwargs["json"]["prompt"])
 
     def test_translation_failure_preserves_generated_lesson(self):
@@ -120,7 +125,7 @@ class LessonPlannerTests(unittest.TestCase):
         self.assertIn("Target video duration: 300 seconds", prompt)
         self.assertIn("Narration speed: 1.2x", prompt)
         self.assertIn("Create exactly 11 presentation slides (scenes)", prompt)
-        self.assertIn("about 884 spoken words", prompt)
+        self.assertIn("about 1060 spoken words", prompt)
         self.assertIn("appropriate technical vocabulary", prompt)
         self.assertIn("Do not fill the extra slides by repeating generic summaries", prompt)
         self.assertEqual(post.call_args.kwargs["json"]["options"]["num_predict"], 2400)
@@ -193,6 +198,67 @@ class LessonPlannerTests(unittest.TestCase):
 
         self.assertEqual(LESSON_SCHEMA["properties"]["scenes"]["minItems"], 3)
         self.assertEqual(LESSON_SCHEMA["properties"]["scenes"]["maxItems"], 12)
+
+
+class LessonDurationTests(unittest.TestCase):
+    def test_tts_pads_final_scene_to_requested_video_duration(self):
+        from core.tts_engine import TTSEngine
+
+        lesson = {
+            "language": "en",
+            "scenes": [
+                {"type": "title_card", "heading": "Intro", "narration": "Introduction."},
+                {"type": "summary", "heading": "Recap", "narration": "Recap."},
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as output_dir:
+            engine = TTSEngine()
+
+            def write_two_second_audio(text, output_wav_path, **kwargs):
+                sf.write(output_wav_path, np.zeros(48000, dtype=np.float32), 24000)
+                return 2.0
+
+            with patch.object(engine, "synthesize_scene", side_effect=write_two_second_audio):
+                enriched, _, _ = engine.synthesize_lesson(
+                    lesson,
+                    output_dir,
+                    target_duration=10,
+                )
+
+            last_scene_path = os.path.join(output_dir, enriched["scenes"][-1]["audio_file"])
+            samples, sample_rate = sf.read(last_scene_path)
+
+        self.assertEqual(sample_rate, 24000)
+        self.assertEqual(len(samples), 8 * sample_rate)
+        self.assertEqual(enriched["total_duration"], 10)
+        self.assertEqual(enriched["scenes"][-1]["end_time"], 10)
+
+    def test_tts_never_cuts_audio_longer_than_requested_duration(self):
+        from core.tts_engine import TTSEngine
+
+        lesson = {
+            "language": "en",
+            "scenes": [
+                {"type": "summary", "heading": "Recap", "narration": "Recap."},
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as output_dir:
+            engine = TTSEngine()
+
+            def write_two_second_audio(text, output_wav_path, **kwargs):
+                sf.write(output_wav_path, np.zeros(48000, dtype=np.float32), 24000)
+                return 2.0
+
+            with patch.object(engine, "synthesize_scene", side_effect=write_two_second_audio):
+                enriched, _, _ = engine.synthesize_lesson(
+                    lesson,
+                    output_dir,
+                    target_duration=1,
+                )
+
+        self.assertEqual(enriched["total_duration"], 2)
 
 
 class EditSceneValidationTests(unittest.TestCase):
@@ -311,6 +377,55 @@ class EditSceneValidationTests(unittest.TestCase):
         self.assertEqual(response.mimetype, "application/json")
         self.assertFalse(response.get_json()["success"])
         self.assertIn("TTS model files are missing", response.get_json()["error"])
+
+    def test_selected_duration_reaches_tts_and_response_metadata(self):
+        lesson = {
+            "title": "A lesson",
+            "level": "beginner",
+            "language": "en",
+            "scenes": [],
+            "total_duration": 60,
+        }
+
+        with (
+            tempfile.TemporaryDirectory() as output_dir,
+            patch.object(self.app_module, "OUTPUT_DIR", output_dir),
+            patch.object(self.app_module, "get_cache_key", return_value="test-key"),
+            patch.object(self.app_module, "get_cached_lesson", return_value=None),
+            patch("app.os.path.isfile", return_value=True),
+            patch.object(
+                self.app_module,
+                "generate_lesson_plan",
+                return_value=(lesson, False, 0.1),
+            ) as planner,
+            patch.object(
+                self.app_module.tts_engine,
+                "synthesize_lesson",
+                return_value=(lesson, "captions.srt", 0.1),
+            ) as tts,
+            patch.object(self.app_module, "export_lesson_mp4", return_value=("lesson.mp4", 0.1)),
+            patch.object(self.app_module, "save_to_cache"),
+        ):
+            response = self.client.post(
+                "/api/generate_full_lesson",
+                json={
+                    "topic": "Test topic",
+                    "target_length": 60,
+                    "speed": 1.2,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        planner.assert_called_once_with(
+            topic="Test topic",
+            level="beginner",
+            language="en",
+            target_length=60,
+            speed=1.2,
+        )
+        self.assertEqual(tts.call_args.kwargs["target_duration"], 60)
+        self.assertEqual(response.get_json()["lesson"]["target_duration"], 60)
+        self.assertEqual(response.get_json()["metrics"]["actual_duration"], 60)
 
     def test_generation_reports_missing_tts_assets_before_planning(self):
         with (

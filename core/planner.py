@@ -68,7 +68,7 @@ def generate_lesson_plan(
     num_scenes = min(12, base_scene_count + level_scene_bonus)
     target_words = max(
         40,
-        round((target_length - num_scenes * 0.5) * 2.5 * speed),
+        round((target_length - num_scenes * 0.5) * 3.0 * speed),
     )
     generation_schema = deepcopy(LESSON_SCHEMA)
     generation_schema["properties"]["scenes"]["minItems"] = num_scenes
@@ -115,7 +115,7 @@ Use only scene types title_card, diagram, code_walkthrough, quiz, and summary. I
                     "num_ctx": 4096
                 }
             },
-            timeout=75
+            timeout=45
         )
         if response.status_code == 200:
             raw_text = response.json().get("response", "").strip()
@@ -187,7 +187,7 @@ def translate_lesson_plan(plan: dict, target_lang: str) -> dict:
                     "num_ctx": 4096,
                 },
             },
-            timeout=60,
+            timeout=20,
         )
         response.raise_for_status()
         translated_narrations = json.loads(response.json().get("response", ""))

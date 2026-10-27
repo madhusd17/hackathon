@@ -135,7 +135,8 @@ def generate_full_lesson():
             lesson=plan,
             output_dir=job_dir,
             voice=voice,
-            speed=speed
+            speed=speed,
+            target_duration=target_length,
         )
 
         # 3. 720p MP4 Video Assembly (Pillow + FFmpeg)

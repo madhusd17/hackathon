@@ -145,7 +145,8 @@ class TTSEngine:
         output_dir: str,
         voice: str = "hf_alpha",
         speed: float = 1.0,
-        pause_seconds: float = 0.5
+        pause_seconds: float = 0.5,
+        target_duration: int | None = None,
     ) -> tuple[dict, str, float]:
         """
         Synthesizes audio for all scenes in the lesson.
@@ -196,6 +197,19 @@ class TTSEngine:
                 f"{idx + 1}\n{format_srt_time(start_time)} --> {format_srt_time(end_time)}\n{narration}\n"
             )
 
+        if target_duration and current_time < target_duration and lesson.get("scenes"):
+            remaining = target_duration - current_time
+            last_scene = lesson["scenes"][-1]
+            last_audio_path = os.path.join(output_dir, last_scene["audio_file"])
+            samples, sample_rate = sf.read(last_audio_path, dtype="float32")
+            padding = np.zeros(round(remaining * sample_rate), dtype=samples.dtype)
+            samples = np.concatenate((samples, padding))
+            sf.write(last_audio_path, samples, sample_rate)
+
+            last_scene["duration"] = round(last_scene["duration"] + remaining, 2)
+            last_scene["end_time"] = round(target_duration, 2)
+            current_time = float(target_duration)
+
         lesson["total_duration"] = round(current_time, 2)
         srt_content = "\n".join(srt_entries)
         srt_path = os.path.join(output_dir, "captions.srt")
@@ -208,4 +222,3 @@ class TTSEngine:
 
 # Global singleton instance
 tts_engine = TTSEngine()
-
