@@ -3,6 +3,8 @@ Built-in fallback lessons in English and 5 Indian languages (Hindi, Tamil, Telug
 Guarantees that the demo NEVER breaks even if the local LLM fails or times out.
 """
 
+from copy import deepcopy
+
 FALLBACK_LESSONS = {
     "python loops": {
         "en": {
@@ -767,20 +769,32 @@ def get_curated_fallback(topic: str, language: str = "en") -> dict | None:
 
     # 1. Direct key match
     for k in FALLBACK_LESSONS:
-        if k in topic_clean or topic_clean in k:
-            return FALLBACK_LESSONS[k].get(lang, FALLBACK_LESSONS[k].get("en"))
+        if k in topic_clean or (len(topic_clean) >= 4 and topic_clean in k):
+            lesson = FALLBACK_LESSONS[k].get(lang, FALLBACK_LESSONS[k].get("en"))
+            return deepcopy(lesson)
 
     # 2. Semantic keyword match
     kw_map = [
         (["loop", "while", "iteration", "for loop"], "python loops"),
-        (["photo", "chlorophyll", "plant", "leaf"], "photosynthesis"),
-        (["newton", "motion", "action reaction", "third law"], "newton's laws"),
+        (["photosynthesis", "chlorophyll"], "photosynthesis"),
+        (
+            [
+                "newton's third law",
+                "newton third law",
+                "newton's 3rd law",
+                "newton 3rd law",
+                "third law of motion",
+                "3rd law of motion",
+                "action reaction",
+            ],
+            "newton's laws",
+        ),
         (["binary search", "bsearch", "halving search"], "binary search"),
-        (["gravity", "gravitation", "orbit", "planetary pull"], "gravity"),
-        (["water cycle", "hydrological", "rain", "evaporation", "cloud"], "water cycle"),
+        (["gravity", "gravitation", "planetary pull"], "gravity"),
+        (["water cycle", "hydrological", "evaporation"], "water cycle"),
         (["recursion", "recursive", "factorial", "call stack"], "recursion"),
         (["git", "github", "version control", "commit", "branch"], "git"),
-        (["solar system", "planet", "jupiter", "mars", "sun"], "solar system"),
+        (["solar system"], "solar system"),
         (["ohm", "circuit", "voltage", "resistance", "electric current"], "ohm's law"),
         (["machine learning", "neural", "ai model", "artificial intelligence", "ml"], "machine learning"),
         (["cell", "mitochondria", "organelle", "cell biology", "nucleus"], "cell biology")
@@ -788,7 +802,8 @@ def get_curated_fallback(topic: str, language: str = "en") -> dict | None:
     for keywords, target_key in kw_map:
         if any(w in topic_clean for w in keywords):
             if target_key in FALLBACK_LESSONS:
-                return FALLBACK_LESSONS[target_key].get(lang, FALLBACK_LESSONS[target_key].get("en"))
+                lesson = FALLBACK_LESSONS[target_key].get(lang, FALLBACK_LESSONS[target_key].get("en"))
+                return deepcopy(lesson)
 
     return None
 
@@ -1104,5 +1119,7 @@ def get_fallback_lesson(topic: str, language: str = "en", level: str = "beginner
     """Finds best matching curated fallback or builds a dynamic topic-tailored lesson."""
     curated = get_curated_fallback(topic, language=language)
     if curated:
+        curated["level"] = level
+        curated["topic"] = topic.strip().title()
         return curated
     return get_dynamic_fallback(topic, language=language, level=level)

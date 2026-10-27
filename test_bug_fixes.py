@@ -1,6 +1,7 @@
 import hashlib
+import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from core.cache_manager import get_cache_key
 
@@ -30,6 +31,114 @@ class CacheKeyTests(unittest.TestCase):
             get_cache_key("Photosynthesis", "hi", "beginner", speed=1.2),
             get_cache_key("Photosynthesis", "hi", "beginner", speed=1.2),
         )
+
+
+class LessonPlannerTests(unittest.TestCase):
+    def test_translation_failure_preserves_generated_lesson(self):
+        from core.planner import translate_lesson_plan
+        import requests
+
+        plan = {
+            "title": "Photosynthesis: A Custom Lesson",
+            "topic": "Photosynthesis",
+            "level": "intermediate",
+            "language": "en",
+            "scenes": [
+                {"type": "title_card", "heading": "Light to Food", "narration": "A custom explanation."},
+                {"type": "summary", "heading": "Recap", "narration": "A custom recap."},
+            ],
+        }
+
+        with patch("core.planner.requests.post", side_effect=requests.ConnectionError):
+            translated = translate_lesson_plan(plan, "hi")
+
+        self.assertEqual(translated["title"], "Photosynthesis: A Custom Lesson")
+        self.assertEqual(translated["language"], "en")
+        self.assertIn("translation_warning", translated)
+
+    def test_local_model_is_tried_before_curated_fallback(self):
+        from core.planner import generate_lesson_plan
+
+        model_plan = {
+            "title": "Photosynthesis: A Custom Lesson",
+            "level": "intermediate",
+            "language": "en",
+            "scenes": [
+                {"type": "title_card", "heading": "Light to Food", "narration": "A custom explanation."},
+                {"type": "summary", "heading": "Recap", "narration": "A custom recap."},
+            ],
+        }
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {"response": json.dumps(model_plan)}
+
+        with (
+            patch("core.planner.requests.post", return_value=response) as post,
+            patch("core.planner.translate_lesson_plan", side_effect=lambda plan, language: plan),
+        ):
+            plan, used_fallback, _ = generate_lesson_plan(
+                "Photosynthesis", level="intermediate", target_length=300
+            )
+
+        self.assertFalse(used_fallback)
+        self.assertEqual(plan["title"], "Photosynthesis: A Custom Lesson")
+        prompt = post.call_args.kwargs["json"]["prompt"]
+        self.assertIn("Learner level: intermediate", prompt)
+        self.assertIn("Target video duration: 300 seconds", prompt)
+        self.assertIn("Create exactly 6 distinct scenes", prompt)
+        self.assertIn("appropriate technical vocabulary", prompt)
+
+    def test_short_duration_requests_two_scenes_and_beginner_language(self):
+        from core.planner import generate_lesson_plan
+
+        model_plan = {
+            "title": "A Lesson",
+            "level": "beginner",
+            "language": "en",
+            "scenes": [
+                {"type": "title_card", "heading": "Intro", "narration": "Start simply."},
+                {"type": "summary", "heading": "Recap", "narration": "Finish simply."},
+            ],
+        }
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {"response": json.dumps(model_plan)}
+
+        with (
+            patch("core.planner.requests.post", return_value=response) as post,
+            patch("core.planner.translate_lesson_plan", side_effect=lambda plan, language: plan),
+        ):
+            generate_lesson_plan("Fractions", level="beginner", target_length=30)
+
+        prompt = post.call_args.kwargs["json"]["prompt"]
+        self.assertIn("Target video duration: 30 seconds", prompt)
+        self.assertIn("Create exactly 2 distinct scenes", prompt)
+        self.assertIn("use everyday words", prompt)
+
+    def test_intermediate_level_adds_a_scene_at_short_duration(self):
+        from core.planner import generate_lesson_plan
+
+        model_plan = {
+            "title": "A Lesson",
+            "level": "intermediate",
+            "language": "en",
+            "scenes": [
+                {"type": "title_card", "heading": "Intro", "narration": "Introduce the topic."},
+                {"type": "diagram", "heading": "Explain", "narration": "Explain the topic."},
+                {"type": "summary", "heading": "Recap", "narration": "Recap the topic."},
+            ],
+        }
+        response = Mock()
+        response.status_code = 200
+        response.json.return_value = {"response": json.dumps(model_plan)}
+
+        with (
+            patch("core.planner.requests.post", return_value=response) as post,
+            patch("core.planner.translate_lesson_plan", side_effect=lambda plan, language: plan),
+        ):
+            generate_lesson_plan("Fractions", level="intermediate", target_length=30)
+
+        self.assertIn("Create exactly 3 distinct scenes", post.call_args.kwargs["json"]["prompt"])
 
 
 class EditSceneValidationTests(unittest.TestCase):
@@ -101,6 +210,15 @@ class EditSceneValidationTests(unittest.TestCase):
             "Photosynthesis", "hi", "beginner", "hf_alpha", 1.2, 30
         )
 
+    def test_generation_rejects_duration_outside_supported_range(self):
+        response = self.client.post(
+            "/api/generate_full_lesson",
+            json={"topic": "Photosynthesis", "target_length": 301},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("30 and 300 seconds", response.get_json()["error"])
+
 
 class TopicDiversityTests(unittest.TestCase):
     def test_curated_topics_produce_distinct_content(self):
@@ -142,3 +260,18 @@ class TopicDiversityTests(unittest.TestCase):
         self.assertIn("Docker", cs_plan["title"])
         self.assertIn("Quantum", physics_plan["title"])
         self.assertNotEqual(cs_plan["scenes"][1]["heading"], physics_plan["scenes"][1]["heading"])
+
+    def test_curated_match_distinguishes_plant_cell_from_photosynthesis(self):
+        from core.fallbacks import get_curated_fallback
+
+        lesson = get_curated_fallback("Plant Cell")
+
+        self.assertIn("Cell", lesson["title"])
+        self.assertNotIn("Photosynthesis", lesson["title"])
+
+    def test_curated_match_does_not_overgeneralize_specific_topics(self):
+        from core.fallbacks import get_curated_fallback
+
+        self.assertIsNone(get_curated_fallback("Newton's Method"))
+        self.assertIsNone(get_curated_fallback("Mars"))
+        self.assertIsNotNone(get_curated_fallback("Newton's 3rd Law of Motion"))

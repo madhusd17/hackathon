@@ -8,8 +8,8 @@ import json
 import logging
 import time
 import requests
-from jsonschema import validate, ValidationError
-from core.fallbacks import get_fallback_lesson, get_curated_fallback
+from jsonschema import validate
+from core.fallbacks import get_fallback_lesson
 
 logger = logging.getLogger(__name__)
 
@@ -55,58 +55,36 @@ def generate_lesson_plan(topic: str, level: str = "beginner", language: str = "e
     """
     t0 = time.time()
 
-    # 1. Check curated library for instant, high-quality pedagogical lessons
-    curated = get_curated_fallback(topic, language=language)
-    if curated:
-        elapsed = time.time() - t0
-        return curated, False, elapsed
-
-    # 2. For custom topics, prompt local LLM (Ollama qwen2.5:3b)
-    num_scenes = 3 if target_length <= 40 else 4
+    # Keep lessons short at the minimum duration and add slides for longer requests.
+    base_scene_count = max(2, min(6, round(target_length / 50)))
+    level_scene_bonus = 1 if level == "intermediate" else 0
+    num_scenes = min(6, base_scene_count + level_scene_bonus)
+    target_words = max(65, round(target_length * 2.1))
+    language_names = {
+        "en": "English",
+        "hi": "Hindi",
+        "ta": "Tamil",
+        "te": "Telugu",
+        "mr": "Marathi",
+        "bn": "Bengali",
+    }
+    language_name = language_names.get(language, "English")
     prompt = f"""You are an educational video script planner.
-Create a concise, structured visual lesson plan for school students.
+Create a lesson specifically about the user's requested topic. Avoid generic filler and do not substitute a broader subject.
 Topic: {topic}
-Learner Level: {level}
-Language: en
-Target Scene Count: {num_scenes}
+Learner level: {level}
+Write the lesson in English. The app will translate narration to {language_name} (language code: {language}).
+Target video duration: {target_length} seconds
+Create exactly {num_scenes} distinct scenes and about {target_words} words of narration in total.
 
-Rules:
-1. Output ONLY a valid JSON object matching this exact schema:
-{{
-  "title": "{topic.title()}",
-  "level": "{level}",
-  "language": "en",
-  "scenes": [
-    {{
-      "type": "title_card",
-      "heading": "Introduction to {topic}",
-      "subheading": "Core concept simplified",
-      "narration": "A one or two sentence clear explanation."
-    }},
-    {{
-      "type": "diagram",
-      "heading": "Step 1: How It Operates",
-      "items": [
-        {{"label": "Step 1", "value": "First action"}},
-        {{"label": "Step 2", "value": "Second action"}},
-        {{"label": "Step 3", "value": "Final outcome"}}
-      ],
-      "narration": "Clear narration explaining each step."
-    }},
-    {{
-      "type": "summary",
-      "heading": "Step 2: Key Takeaways",
-      "items": [
-        {{"label": "Fact 1", "value": "Summary point one"}},
-        {{"label": "Fact 2", "value": "Summary point two"}}
-      ],
-      "narration": "Conclusive summary reinforcing learning."
-    }}
-  ]
-}}
-2. If the topic involves programming or code, use 'code_walkthrough' with 'code' and 'highlight_lines' for scene 2.
-3. No markdown, no conversation, only the raw JSON.
-Output valid JSON:"""
+Use an engaging progression: introduce the exact topic, explain its important parts, give a relevant example or application, then recap. Use a code_walkthrough scene for programming topics and include valid code and highlight_lines. Use diagram scenes for processes and concepts. Include a short quiz when there are enough scenes.
+
+For beginners, use everyday words, avoid unexplained technical terms, and explain any necessary new term simply. For intermediate learners, include appropriate technical vocabulary and briefly explain less familiar terms.
+Every scene must contribute a different, topic-specific idea. Do not repeat the same generic steps across topics.
+
+Return ONLY one valid JSON object with this structure:
+{{"title":"A topic-specific title","level":"{level}","language":"en","scenes":[{{"type":"title_card","heading":"Scene heading","narration":"Spoken explanation","subheading":"Optional","items":[{{"label":"Label","value":"Detail"}}],"code":"Optional code","highlight_lines":[1],"output":"Optional output","question":"Optional quiz question","options":["A","B"],"answer":"Optional correct answer"}}]}}
+Use only scene types title_card, diagram, code_walkthrough, quiz, and summary. Include only relevant optional fields. Ensure the JSON is complete and has exactly {num_scenes} scenes."""
 
     try:
         response = requests.post(
@@ -117,13 +95,13 @@ Output valid JSON:"""
                 "stream": False,
                 "format": "json",
                 "options": {
-                    "temperature": 0.2,
-                    "num_predict": 300,
+                    "temperature": 0.35,
+                    "num_predict": max(900, min(2400, target_words * 4)),
                     "num_thread": 4,
-                    "num_ctx": 1024
+                    "num_ctx": 4096
                 }
             },
-            timeout=25
+            timeout=60
         )
         if response.status_code == 200:
             raw_text = response.json().get("response", "").strip()
@@ -169,12 +147,6 @@ def translate_lesson_plan(plan: dict, target_lang: str) -> dict:
     if not target_name:
         return plan
 
-    # Check if a curated lesson exists for this topic in target language
-    topic = plan.get("topic", plan.get("title", ""))
-    curated = get_curated_fallback(topic, language=target_lang)
-    if curated and curated.get("language") == target_lang:
-        return curated
-
     # Attempt fast sentence-by-sentence translation
     try:
         translated_scenes = []
@@ -192,10 +164,12 @@ def translate_lesson_plan(plan: dict, target_lang: str) -> dict:
                 },
                 timeout=10
             )
+            res.raise_for_status()
             if res.status_code == 200:
                 translated_text = res.json().get("response", "").strip()
-                if translated_text:
-                    sc_copy["narration"] = translated_text
+                if not translated_text:
+                    raise ValueError("Translation returned empty narration.")
+                sc_copy["narration"] = translated_text
             translated_scenes.append(sc_copy)
             
         plan["scenes"] = translated_scenes
@@ -203,6 +177,6 @@ def translate_lesson_plan(plan: dict, target_lang: str) -> dict:
         return plan
     except Exception as e:
         logger.warning(f"Translation call failed: {e}")
-
-    # If translation call fails, use dynamic fallback in target language
-    return get_fallback_lesson(topic, language=target_lang, level=plan.get("level", "beginner"))
+        plan["language"] = "en"
+        plan["translation_warning"] = "Local translation unavailable; English narration is shown."
+        return plan

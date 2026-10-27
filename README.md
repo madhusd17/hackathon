@@ -10,7 +10,7 @@ Built for the **Blu Visual Teacher Hackathon (2026)**.
 
 - **100% Offline & CPU-First**: Runs without internet. No OpenAI, Gemini, Claude, ElevenLabs, or cloud APIs.
 - **5 Complete Pipeline Stages**:
-  1. **Concept Input**: Web interface for topic, learner level, language, voice, and speed.
+  1. **Concept Input**: Web interface for topic, learner level, language, voice, speed, and a 30-second to 5-minute target duration.
   2. **Lesson Planner (Local LLM)**: Local **Qwen 2.5 3B** (via Ollama) generates structured JSON validated against strict JSON Schema, with automatic graceful fallback to curated lessons so live demos never fail.
   3. **Visual Engine**: Reusable animated components for:
      - `title_card` (Animated hero title, concept tags, subtitle)
@@ -24,6 +24,7 @@ Built for the **Blu Visual Teacher Hackathon (2026)**.
   - **6 Languages**: English + 5 Indian languages (Hindi, Tamil, Telugu, Marathi, Bengali).
   - **Re-Voice Lesson**: Switch languages for an already planned lesson without re-planning it.
   - **Voice & Speed Control**: Male (`hm_omega`), Female (`hf_alpha`), and 0.8x–1.3x speed slider.
+  - **Adaptive Lesson Planning**: Scene count and narration length scale with the selected video duration; intermediate lessons add a scene when possible, and vocabulary adapts to the learner level.
   - **Teacher Scene Editor**: Tweak narration, code, or headings before rendering and regenerate only that scene.
   - **Lesson Caching**: Hash-based disk cache for instant replay.
   - **Stage Benchmarking**: Live timer display for each stage (Planner, TTS, Video).
@@ -127,4 +128,3 @@ lesson-to-video/
 - [x] **Playable 720p MP4**: Exports 1280x720 H.264 video with AAC audio and matching subtitles.
 - [x] **Audio sets scene duration**: Visuals and audio stay in step with no drift.
 - [x] **Fallback robustness**: Bad LLM responses or timeouts fall back instantly to built-in lessons.
-

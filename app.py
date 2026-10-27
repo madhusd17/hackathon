@@ -45,7 +45,17 @@ def generate_full_lesson():
     language = data.get("language", "en")
     voice = data.get("voice", "hf_alpha")
     speed = float(data.get("speed", 1.0))
-    target_length = int(data.get("target_length", 45))
+    raw_target_length = data.get("target_length", 45)
+    if isinstance(raw_target_length, bool) or (
+        isinstance(raw_target_length, float) and not raw_target_length.is_integer()
+    ):
+        return jsonify({"success": False, "error": "Video duration must be between 30 and 300 seconds."}), 400
+    try:
+        target_length = int(raw_target_length)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Video duration must be between 30 and 300 seconds."}), 400
+    if not 30 <= target_length <= 300:
+        return jsonify({"success": False, "error": "Video duration must be between 30 and 300 seconds."}), 400
     force_refresh = bool(data.get("force_refresh", False))
 
     cache_key = get_cache_key(topic, language, level, voice, speed, target_length)
@@ -65,7 +75,8 @@ def generate_full_lesson():
                     "tts_s": 0.01,
                     "video_s": 0.01,
                     "total_s": round(time.time() - total_t0, 2),
-                    "used_fallback": False
+                    "used_fallback": bool(cached.get("used_fallback", False)),
+                    "translation_warning": cached.get("translation_warning")
                 }
             })
 
@@ -97,6 +108,7 @@ def generate_full_lesson():
     enriched_lesson["job_id"] = job_id
     enriched_lesson["voice"] = voice
     enriched_lesson["speed"] = speed
+    enriched_lesson["used_fallback"] = used_fallback
 
     # Save to Cache
     save_to_cache(cache_key, enriched_lesson, job_dir)
@@ -111,7 +123,8 @@ def generate_full_lesson():
             "tts_s": round(tts_s, 2),
             "video_s": round(video_s, 2),
             "total_s": total_s,
-            "used_fallback": used_fallback
+            "used_fallback": used_fallback,
+            "translation_warning": enriched_lesson.get("translation_warning")
         }
     })
 

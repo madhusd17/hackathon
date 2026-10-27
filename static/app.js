@@ -16,6 +16,13 @@ function setTopic(val) {
   document.getElementById("topic-input").value = val;
 }
 
+function updateDurationLabel(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  document.getElementById("duration-val").innerText =
+    `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 // ----------------------------------------------------
 // 1. GENERATE LESSON (Stage 1 & 2 -> 3, 4, 5)
 // ----------------------------------------------------
@@ -25,6 +32,7 @@ async function generateLesson() {
   const voice = document.getElementById("voice-select").value;
   const level = document.getElementById("level-select").value;
   const speed = parseFloat(document.getElementById("speed-slider").value);
+  const targetLength = parseInt(document.getElementById("duration-slider").value, 10);
   const forceRefresh = document.getElementById("force-refresh").checked;
 
   if (!topic) return;
@@ -67,6 +75,7 @@ async function generateLesson() {
         voice: voice,
         level: level,
         speed: speed,
+        target_length: targetLength,
         force_refresh: forceRefresh
       })
     });
@@ -128,6 +137,13 @@ function displayMetrics(metrics, isCached) {
   } else {
     cachedBadge.classList.add("hidden");
   }
+
+  const fallbackBadge = document.getElementById("fallback-badge");
+  fallbackBadge.classList.toggle("hidden", !metrics.used_fallback);
+
+  const translationWarningBadge = document.getElementById("translation-warning-badge");
+  translationWarningBadge.innerText = metrics.translation_warning || "";
+  translationWarningBadge.classList.toggle("hidden", !metrics.translation_warning);
 }
 
 // ----------------------------------------------------
@@ -684,4 +700,3 @@ function escapeHtml(str) {
 window.addEventListener("DOMContentLoaded", () => {
   loadCachedLessons();
 });
-
