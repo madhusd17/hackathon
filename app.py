@@ -7,6 +7,7 @@ import os
 import time
 import uuid
 import logging
+import math
 from flask import Flask, render_template, request, jsonify, send_file, send_from_directory
 from core.planner import generate_lesson_plan, translate_lesson_plan
 from core.tts_engine import tts_engine
@@ -47,7 +48,7 @@ def generate_full_lesson():
     target_length = int(data.get("target_length", 45))
     force_refresh = bool(data.get("force_refresh", False))
 
-    cache_key = get_cache_key(topic, language, level, voice)
+    cache_key = get_cache_key(topic, language, level, voice, speed, target_length)
     
     # Check cache if not forcing refresh
     if not force_refresh:
@@ -122,7 +123,10 @@ def revoice_lesson():
     Re-voices a finished lesson into another language without re-planning the scenes!
     """
     t0 = time.time()
-    data = request.json or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"success": False, "error": "Invalid request data"}), 400
+
     lesson = data.get("lesson")
     new_lang = data.get("new_language", "hi")
     new_voice = data.get("new_voice", "hf_alpha")
@@ -172,14 +176,37 @@ def edit_scene():
     t0 = time.time()
     data = request.json or {}
     lesson = data.get("lesson")
-    scene_idx = int(data.get("scene_index", 0))
+    scene_idx = data.get("scene_index", 0)
     updated_scene = data.get("updated_scene")
+
+    if (
+        not isinstance(lesson, dict)
+        or not isinstance(lesson.get("scenes"), list)
+        or not isinstance(scene_idx, int)
+        or isinstance(scene_idx, bool)
+        or scene_idx < 0
+        or scene_idx >= len(lesson["scenes"])
+        or not isinstance(updated_scene, dict)
+    ):
+        return jsonify({"success": False, "error": "Invalid lesson or scene data"}), 400
+
+    if any(
+        not isinstance(scene, dict)
+        or (
+            index != scene_idx
+            and (
+                not isinstance(scene.get("duration"), (int, float))
+                or isinstance(scene.get("duration"), bool)
+                or not math.isfinite(scene["duration"])
+            )
+        )
+        for index, scene in enumerate(lesson["scenes"])
+    ):
+        return jsonify({"success": False, "error": "Invalid lesson scene data"}), 400
+
     job_id = lesson.get("job_id", f"edit_{uuid.uuid4().hex[:6]}")
     job_dir = os.path.join(OUTPUT_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
-
-    if not lesson or scene_idx >= len(lesson.get("scenes", [])):
-        return jsonify({"success": False, "error": "Invalid scene index"}), 400
 
     lesson["scenes"][scene_idx] = updated_scene
 
@@ -267,4 +294,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.warning(f"Could not warm up TTS immediately: {e}")
     app.run(host="127.0.0.1", port=5000, debug=False)
-

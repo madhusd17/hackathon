@@ -751,98 +751,358 @@ FALLBACK_LESSONS = {
     }
 }
 
-def get_fallback_lesson(topic: str, language: str = "en", level: str = "beginner") -> dict:
-    """Finds the best matching fallback lesson or creates a structured one."""
+
+# Additional curated STEM & Computer Science topics
+NEW_TOPICS = {'binary search': {'en': {'title': 'How Binary Search Works', 'level': 'beginner', 'language': 'en', 'topic': 'Binary Search', 'scenes': [{'type': 'title_card', 'heading': 'What is Binary Search?', 'subheading': 'Divide and conquer search algorithm', 'narration': 'Binary search finds an item in a sorted list by repeatedly dividing the search space in half.'}, {'type': 'code_walkthrough', 'heading': 'Step 1: Divide and Check', 'code': 'low = 0\nhigh = len(arr) - 1\nmid = (low + high) // 2\nif arr[mid] == target:\n    return mid', 'highlight_lines': [3, 4], 'output': 'Target found at index 2', 'narration': 'We check the middle element. If the target is smaller, we search left; otherwise, we search right.'}, {'type': 'diagram', 'heading': 'Step 2: Halving Search Space', 'items': [{'label': 'Pass 1', 'value': 'Compare mid: 8 items left'}, {'label': 'Pass 2', 'value': 'Discard half: 4 items left'}, {'label': 'Pass 3', 'value': 'Found in O(log n) time'}], 'narration': 'With every comparison, half the remaining elements are eliminated, making it much faster than linear search.'}, {'type': 'quiz', 'heading': 'Step 3: Quick Check', 'question': 'What is strictly required for binary search to work?', 'options': ['Sorted array', 'Small array', 'Only even numbers', 'No requirement'], 'answer': 'Sorted array', 'narration': 'Binary search strictly requires a sorted array so it can determine which half to discard.'}]}, 'hi': {'title': 'बाइनरी सर्च कैसे काम करता है', 'level': 'beginner', 'language': 'hi', 'topic': 'Binary Search', 'scenes': [{'type': 'title_card', 'heading': 'बाइनरी सर्च क्या है?', 'subheading': 'डिवाइड और कॉन्कर तकनीक', 'narration': 'बाइनरी सर्च एक क्रमित सूची में किसी तत्व को खोजने के लिए खोज क्षेत्र को बार-बार आधा करता है।'}, {'type': 'code_walkthrough', 'heading': 'चरण १: मध्य तत्व की जांच', 'code': 'low = 0\nhigh = len(arr) - 1\nmid = (low + high) // 2\nif arr[mid] == target:\n    return mid', 'highlight_lines': [3, 4], 'output': 'Target found at index 2', 'narration': 'हम मध्य इंडेक्स निकालते हैं और तुलना करके तय करते हैं कि बाईं ओर खोजना है या दाईं ओर।'}, {'type': 'diagram', 'heading': 'चरण २: खोज क्षेत्र को आधा करना', 'items': [{'label': 'पहला चरण', 'value': 'मध्य तत्व की तुलना'}, {'label': 'दूसरा चरण', 'value': 'आधा हिस्सा छोड़ना'}, {'label': 'तीसरा चरण', 'value': 'लघुगणकीय समय में लक्ष्य'}], 'narration': 'हर तुलना में आधे तत्व बाहर हो जाते हैं, जिससे यह लीनियर सर्च से कहीं अधिक तेज़ होता है।'}, {'type': 'quiz', 'heading': 'चरण ३: त्वरित प्रश्न', 'question': 'बाइनरी सर्च के लिए अनिवार्य शर्त क्या है?', 'options': ['सॉर्टेड सूची', 'छोटी सूची', 'केवल सम संख्याएं', 'कोई शर्त नहीं'], 'answer': 'सॉर्टेड सूची', 'narration': 'बाइनरी सर्च केवल तभी काम करता है जब सूची पहले से क्रमबद्ध या सॉर्ट की गई हो।'}]}}, 'gravity': {'en': {'title': 'Understanding Gravity', 'level': 'beginner', 'language': 'en', 'topic': 'Gravity', 'scenes': [{'type': 'title_card', 'heading': 'What is Gravity?', 'subheading': 'The universal attractive force', 'narration': 'Gravity is the fundamental force by which all physical objects with mass attract one another.'}, {'type': 'diagram', 'heading': 'Step 1: The Core Principles', 'items': [{'label': 'Mass', 'value': 'Greater mass creates stronger pull'}, {'label': 'Distance', 'value': 'Greater distance rapidly weakens pull'}, {'label': 'Orbits', 'value': 'Balances inertia to hold planets in orbit'}], 'narration': 'Newton showed that gravitational attraction depends directly on mass and inversely on distance squared.'}, {'type': 'summary', 'heading': 'Step 2: Key Takeaways', 'items': [{'label': 'Acceleration', 'value': 'Earth pulls objects at 9.8 meters per second squared'}, {'label': 'Ocean Tides', 'value': "Moon's gravity creates high and low tides"}, {'label': 'Atmosphere', 'value': 'Keeps air and oceans bound to planet Earth'}], 'narration': "Without gravity, the Earth's atmosphere, oceans, and living beings would drift away into space."}]}, 'hi': {'title': 'गुरुत्वाकर्षण बल कैसे काम करता है', 'level': 'beginner', 'language': 'hi', 'topic': 'Gravity', 'scenes': [{'type': 'title_card', 'heading': 'गुरुत्वाकर्षण क्या है?', 'subheading': 'ब्रह्मांडीय आकर्षण बल', 'narration': 'गुरुत्वाकर्षण वह अदृश्य बल है जो द्रव्यमान वाली सभी वस्तुओं को एक-दूसरे की ओर खींचता है।'}, {'type': 'diagram', 'heading': 'चरण १: मुख्य नियम', 'items': [{'label': 'द्रव्यमान', 'value': 'अधिक द्रव्यमान मतलब अधिक खिंचाव'}, {'label': 'दूरी', 'value': 'दूरी बढ़ने पर बल तेजी से घटता है'}, {'label': 'कक्षा', 'value': 'ग्रहों को सूर्य के चारों ओर बांधे रखता है'}], 'narration': 'न्यूटन के अनुसार गुरुत्वाकर्षण द्रव्यमान के समानुपाती और दूरी के वर्ग के व्युत्क्रमानुपाती होता है।'}, {'type': 'summary', 'heading': 'चरण २: मुख्य सारांश', 'items': [{'label': 'पृथ्वी का त्वरण', 'value': 'गिरती वस्तुओं पर 9.8 मीटर प्रति सेकंड वर्ग'}, {'label': 'ज्वार-भाटा', 'value': 'चंद्रमा के खिंचाव से समुद्र में लहरें'}, {'label': 'जीवन रक्षा', 'value': 'वायुमंडल को पृथ्वी की सतह पर बनाए रखना'}], 'narration': 'गुरुत्वाकर्षण के बिना वायुमंडल और महासागर अंतरिक्ष में विलीन हो जाएंगे।'}]}}, 'water cycle': {'en': {'title': 'How the Water Cycle Works', 'level': 'beginner', 'language': 'en', 'topic': 'Water Cycle', 'scenes': [{'type': 'title_card', 'heading': 'The Hydrological Cycle', 'subheading': "Earth's continuous water recycling system", 'narration': "The water cycle describes how water continuously circulates through Earth's oceans, atmosphere, and land."}, {'type': 'diagram', 'heading': 'Step 1: The Three Main Stages', 'items': [{'label': 'Evaporation', 'value': 'Solar heat turns liquid water into rising vapor'}, {'label': 'Condensation', 'value': 'Cooling vapor gathers to form clouds'}, {'label': 'Precipitation', 'value': 'Rain or snow falls back to nourish land'}], 'narration': 'Sunlight evaporates surface water into vapor, which cools into clouds and returns to ground as precipitation.'}, {'type': 'summary', 'heading': 'Step 2: Why It Matters', 'items': [{'label': 'Freshwater', 'value': 'Replenishes rivers, lakes, and drinking water'}, {'label': 'Climate', 'value': 'Transfers heat to regulate global climate'}, {'label': 'Ecosystems', 'value': 'Sustains plant and animal life worldwide'}], 'narration': "The water cycle naturally filters water and distributes rainfall across our planet's ecosystems."}]}, 'hi': {'title': 'जल चक्र कैसे काम करता है', 'level': 'beginner', 'language': 'hi', 'topic': 'Water Cycle', 'scenes': [{'type': 'title_card', 'heading': 'जल चक्र क्या है?', 'subheading': 'प्रकृति की निरंतर जल प्रणाली', 'narration': 'जल चक्र पृथ्वी, महासागरों और वायुमंडल के बीच पानी के निरंतर संचलन की प्रक्रिया है।'}, {'type': 'diagram', 'heading': 'चरण १: चक्र के मुख्य चरण', 'items': [{'label': 'वाष्पीकरण', 'value': 'सूर्य की गर्मी से जल वाष्प बनता है'}, {'label': 'संघनन', 'value': 'ठंडी वाष्प बादलों का रूप लेती है'}, {'label': 'वर्षा', 'value': 'वर्षा की बूंदें जमीन पर लौटती हैं'}], 'narration': 'सूर्य से पानी वाष्प बनकर ऊपर उठता है, बादलों में संघनित होता है, और वर्षा के रूप में धरती पर लौटता है।'}, {'type': 'summary', 'heading': 'चरण २: मुख्य लाभ', 'items': [{'label': 'ताजा पानी', 'value': 'नदियों और भूजल को फिर से भरना'}, {'label': 'मौसम नियंत्रण', 'value': 'धरती के तापमान को संतुलित रखना'}, {'label': 'जीवन रक्षा', 'value': 'कृषि और वन्यजीवों के लिए जीवनदायी'}], 'narration': 'जल चक्र हमारे ग्रह पर शुद्ध पानी उपलब्ध कराता है और पूरे पारिस्थितिकी तंत्र को जीवित रखता है।'}]}}, 'recursion': {'en': {'title': 'Understanding Recursion in Code', 'level': 'beginner', 'language': 'en', 'topic': 'Recursion', 'scenes': [{'type': 'title_card', 'heading': 'What is Recursion?', 'subheading': 'Functions calling themselves to solve problems', 'narration': 'Recursion is a programming technique where a function calls itself to solve smaller pieces of a problem.'}, {'type': 'code_walkthrough', 'heading': 'Step 1: The Factorial Function', 'code': 'def factorial(n):\n    if n <= 1:  # Base Case\n        return 1\n    return n * factorial(n - 1)', 'highlight_lines': [2, 4], 'output': 'factorial(3) = 3 * 2 * 1 = 6', 'narration': 'Every recursive function requires a base case to stop, and a recursive step that shrinks the input.'}, {'type': 'diagram', 'heading': 'Step 2: The Call Stack', 'items': [{'label': 'Call factorial(3)', 'value': 'Waits for factorial(2)'}, {'label': 'Call factorial(2)', 'value': 'Waits for factorial(1)'}, {'label': 'Base Case Reach', 'value': 'Returns 1 and unwinds stack'}], 'narration': 'Each call is pushed onto the stack until the base case returns, then values multiply on the way down.'}]}, 'hi': {'title': 'प्रोग्रामिंग में रिकर्शन कैसे काम करता है', 'level': 'beginner', 'language': 'hi', 'topic': 'Recursion', 'scenes': [{'type': 'title_card', 'heading': 'रिकर्शन क्या है?', 'subheading': 'स्वयं को कॉल करने वाला फंक्शन', 'narration': 'रिकर्शन एक ऐसी तकनीक है जिसमें कोई फंक्शन किसी समस्या को हल करने के लिए खुद को कॉल करता है।'}, {'type': 'code_walkthrough', 'heading': 'चरण १: फैक्टोरियल उदाहरण', 'code': 'def factorial(n):\n    if n <= 1:  # Base Case\n        return 1\n    return n * factorial(n - 1)', 'highlight_lines': [2, 4], 'output': 'factorial(3) = 6', 'narration': 'हर रिकर्सिव फंक्शन में रुकने के लिए एक बेस केस और खुद को कॉल करने वाला स्टेप होता है।'}, {'type': 'diagram', 'heading': 'चरण २: कॉल स्टैक समझना', 'items': [{'label': 'कॉल ३', 'value': 'factorial(2) का इंतज़ार'}, {'label': 'कॉल २', 'value': 'factorial(1) का इंतज़ार'}, {'label': 'बेस केस', 'value': 'मान लौटता है और स्टैक खाली होता है'}], 'narration': 'सभी फंक्शन कॉल्स मेमोरी स्टैक में जमा होते हैं और बेस केस आने पर क्रमिक रूप से हल होते हैं।'}]}}, 'git': {'en': {'title': 'How Git Version Control Works', 'level': 'beginner', 'language': 'en', 'topic': 'Git', 'scenes': [{'type': 'title_card', 'heading': 'What is Git?', 'subheading': 'Distributed version control system', 'narration': 'Git tracks changes in your source code across time, allowing teams to collaborate and rollback mistakes safely.'}, {'type': 'code_walkthrough', 'heading': 'Step 1: Core Workflow', 'code': "git status          # Check files\ngit add .           # Stage changes\ngit commit -m 'feat' # Save snapshot\ngit push origin main # Share with remote", 'highlight_lines': [2, 3], 'output': '[main 4a8b1c] feat: lesson engine ready', 'narration': 'You stage your changes with git add, and record a permanent historical snapshot with git commit.'}, {'type': 'diagram', 'heading': 'Step 2: The Three Git Areas', 'items': [{'label': 'Working Directory', 'value': 'Files you are actively editing'}, {'label': 'Staging Area', 'value': 'Prepared changes for next commit'}, {'label': 'Repository', 'value': 'Permanent commit snapshot history'}], 'narration': 'Code moves from your workspace into the staging area, and is sealed permanently into the repository.'}]}, 'hi': {'title': 'गिट वर्ज़न कंट्रोल कैसे काम करता है', 'level': 'beginner', 'language': 'hi', 'topic': 'Git', 'scenes': [{'type': 'title_card', 'heading': 'गिट क्या है?', 'subheading': 'वितरित वर्ज़न कंट्रोल प्रणाली', 'narration': 'गिट आपके कोड में होने वाले हर बदलाव का इतिहास रखता है ताकि टीम सुरक्षित रूप से काम कर सके।'}, {'type': 'code_walkthrough', 'heading': 'चरण १: मुख्य कमांड्स', 'code': "git status          # बदलाव देखें\ngit add .           # फाइलें स्टेज करें\ngit commit -m 'feat' # स्नैपशॉट सहेजें\ngit push origin main # सर्वर पर भेजें", 'highlight_lines': [2, 3], 'output': '[main 4a8b1c] feat: lesson engine ready', 'narration': 'गिट ऐड से फाइलें स्टेज की जाती हैं और गिट कमिट से उनका स्थायी रिकॉर्ड बन जाता है।'}, {'type': 'diagram', 'heading': 'चरण २: गिट के तीन क्षेत्र', 'items': [{'label': 'वर्किंग डायरेक्टरी', 'value': 'जहां आप फाइलें बदलते हैं'}, {'label': 'स्टेजिंग एरिया', 'value': 'कमिट के लिए तैयार फाइलें'}, {'label': 'कमिट इतिहास', 'value': 'सुरक्षित स्नैपशॉट का टाइमलाइन'}], 'narration': 'गिट कोड को वर्किंग डायरेक्टरी से स्टेजिंग एरिया और फिर कमिट इतिहास में सुरक्षित करता है।'}]}}, 'solar system': {'en': {'title': 'Exploring the Solar System', 'level': 'beginner', 'language': 'en', 'topic': 'Solar System', 'scenes': [{'type': 'title_card', 'heading': 'Our Cosmic Neighborhood', 'subheading': 'The Sun and orbiting planets', 'narration': 'The solar system consists of our central star, the Sun, and all celestial bodies bound to it by gravity.'}, {'type': 'diagram', 'heading': 'Step 1: Planetary Layout', 'items': [{'label': 'Inner Rocky', 'value': 'Mercury, Venus, Earth, and Mars'}, {'label': 'Asteroid Belt', 'value': 'Rocky boundary dividing orbital zones'}, {'label': 'Outer Giants', 'value': 'Jupiter, Saturn, Uranus, Neptune'}], 'narration': 'Four rocky planets orbit closest to the Sun, followed by four massive gas and ice giants.'}, {'type': 'summary', 'heading': 'Step 2: Key Facts', 'items': [{'label': "Sun's Mass", 'value': 'Contains 99.8 percent of all system mass'}, {'label': 'Habitable Zone', 'value': 'Earth is positioned where liquid water can exist'}, {'label': 'Orbital Motion', 'value': 'Gravity keeps all planets in synchronized motion'}], 'narration': "The Sun's enormous gravitational attraction keeps eight planets in stable elliptical orbits."}]}, 'hi': {'title': 'सौरमंडल कैसे काम करता है', 'level': 'beginner', 'language': 'hi', 'topic': 'Solar System', 'scenes': [{'type': 'title_card', 'heading': 'हमारा सौरमंडल', 'subheading': 'सूर्य और परिक्रमा करते ग्रह', 'narration': 'सौरमंडल में हमारे केंद्र में स्थित सूर्य और गुरुत्वाकर्षण से बंधे सभी आठ ग्रह शामिल हैं।'}, {'type': 'diagram', 'heading': 'चरण १: ग्रहों की संरचना', 'items': [{'label': 'आंतरिक ग्रह', 'value': 'बुध, शुक्र, पृथ्वी और मंगल'}, {'label': 'क्षुद्रग्रह पट्टी', 'value': 'चट्टानी पत्थरों का विशाल घेरा'}, {'label': 'बाह्य गैसीय ग्रह', 'value': 'बृहस्पति, शनि, यूरेनस और नेपच्यून'}], 'narration': 'सूर्य के सबसे करीब चार ठोस पथरीले ग्रह हैं, और उसके बाद चार विशाल गैसीय ग्रह स्थित हैं।'}, {'type': 'summary', 'heading': 'चरण २: मुख्य तथ्य', 'items': [{'label': 'सूर्य का भार', 'value': 'सौरमंडल के कुल द्रव्यमान का 99.8 प्रतिशत'}, {'label': 'गोल्डीलॉक्स ज़ोन', 'value': 'पृथ्वी पर तरल पानी और जीवन संभव'}, {'label': 'कक्षा का नियम', 'value': 'गुरुत्वाकर्षण सभी ग्रहों को व्यवस्थित रखता है'}], 'narration': 'सूर्य का शक्तिशाली गुरुत्वाकर्षण सभी ग्रहों को उनकी निर्धारित कक्षाओं में घुमाता है।'}]}}, "ohm's law": {'en': {'title': "Understanding Ohm's Law", 'level': 'beginner', 'language': 'en', 'topic': "Ohm's Law", 'scenes': [{'type': 'title_card', 'heading': "What is Ohm's Law?", 'subheading': 'The foundation of electrical circuits', 'narration': "Ohm's Law states that current through a conductor is proportional to voltage and inversely proportional to resistance."}, {'type': 'diagram', 'heading': 'Step 1: The V = I * R Triangle', 'items': [{'label': 'Voltage (V)', 'value': 'Electrical potential pushing charges (Volts)'}, {'label': 'Current (I)', 'value': 'Rate of electron charge flow (Amperes)'}, {'label': 'Resistance (R)', 'value': 'Opposition to electrical charge flow (Ohms)'}], 'narration': 'Voltage provides the push, current is the electron flow, and resistance opposes that flow.'}, {'type': 'quiz', 'heading': 'Step 2: Circuit Calculation', 'question': 'If Voltage is 10V and Resistance is 5 Ohms, what is Current?', 'options': ['2 Amperes', '50 Amperes', '0.5 Amperes', '5 Amperes'], 'answer': '2 Amperes', 'narration': 'Using the formula I equals V divided by R, ten volts divided by five ohms gives two amperes.'}]}, 'hi': {'title': 'ओम का नियम कैसे काम करता है', 'level': 'beginner', 'language': 'hi', 'topic': "Ohm's Law", 'scenes': [{'type': 'title_card', 'heading': 'ओम का नियम क्या है?', 'subheading': 'विद्युत परिपथ का आधार', 'narration': 'ओम के नियम के अनुसार किसी चालक में प्रवाहित धारा वोल्टेज के समानुपाती और प्रतिरोध के व्युत्क्रमानुपाती होती है।'}, {'type': 'diagram', 'heading': 'चरण १: सूत्र V = I * R', 'items': [{'label': 'वोल्टेज (V)', 'value': 'इलेक्ट्रॉनों को धक्का देने वाला विद्युत विभव'}, {'label': 'धारा (I)', 'value': 'आवेश प्रवाह की दर (एम्पीयर)'}, {'label': 'प्रतिरोध (R)', 'value': 'विद्युत धारा के मार्ग में रुकावट (ओम)'}], 'narration': 'वोल्टेज धक्का देता है, धारा इलेक्ट्रॉनों का प्रवाह है, और प्रतिरोध इस प्रवाह का विरोध करता है।'}, {'type': 'quiz', 'heading': 'चरण २: त्वरित गणना', 'question': 'यदि वोल्टेज 10V और प्रतिरोध 5 ओम है, तो धारा क्या होगी?', 'options': ['2 एम्पीयर', '50 एम्पीयर', '0.5 एम्पीयर', '5 एम्पीयर'], 'answer': '2 एम्पीयर', 'narration': 'सूत्र I बराबर V भाग R से, 10 भाग 5 का परिणाम दो एम्पीयर होता है।'}]}}, 'machine learning': {'en': {'title': 'How Machine Learning Works', 'level': 'beginner', 'language': 'en', 'topic': 'Machine Learning', 'scenes': [{'type': 'title_card', 'heading': 'What is Machine Learning?', 'subheading': 'Computers learning patterns from data', 'narration': 'Machine learning enables computers to learn patterns directly from data to make decisions without explicit programming.'}, {'type': 'diagram', 'heading': 'Step 1: The Learning Pipeline', 'items': [{'label': 'Training Data', 'value': 'Feeding real-world examples to model'}, {'label': 'Pattern Learning', 'value': 'Adjusting internal weights to reduce error'}, {'label': 'Inference', 'value': 'Predicting accurate outputs for new inputs'}], 'narration': 'The model studies thousands of data samples, adjusts its internal weights, and learns to make accurate predictions.'}, {'type': 'summary', 'heading': 'Step 2: Key Takeaways', 'items': [{'label': 'Supervised', 'value': 'Learns from labeled examples with ground truth'}, {'label': 'Unsupervised', 'value': 'Discovers natural clusters in unlabeled data'}, {'label': 'Real World', 'value': 'Powers speech recognition, vision, and healthcare'}], 'narration': 'Machine learning powers modern innovations like voice assistants, recommendation engines, and robotics.'}]}, 'hi': {'title': 'मशीन लर्निंग कैसे काम करती है', 'level': 'beginner', 'language': 'hi', 'topic': 'Machine Learning', 'scenes': [{'type': 'title_card', 'heading': 'मशीन लर्निंग क्या है?', 'subheading': 'डेटा से पैटर्न सीखने वाले कंप्यूटर', 'narration': 'मशीन लर्निंग कंप्यूटर को बिना सीधे कोड किए डेटा से पैटर्न सीखकर निर्णय लेने की क्षमता देती है।'}, {'type': 'diagram', 'heading': 'चरण १: सीखने की प्रक्रिया', 'items': [{'label': 'प्रशिक्षण डेटा', 'value': 'मॉडल को वास्तविक उदाहरण प्रदान करना'}, {'label': 'पैटर्न पहचान', 'value': 'त्रुटि घटाने के लिए भार समायोजित करना'}, {'label': 'अनुमान', 'value': 'नए डेटा पर सटीक परिणाम देना'}], 'narration': 'मॉडल हज़ारों उदाहरणों का अध्ययन करता है और नए इनपुट पर सटीक भविष्यवाणी करना सीख जाता है।'}, {'type': 'summary', 'heading': 'चरण २: मुख्य सारांश', 'items': [{'label': 'सुपरवाइज्ड', 'value': 'लेबल किए गए सही उत्तरों से सीखना'}, {'label': 'अनसुपरवाइज्ड', 'value': 'डेटा में छिपे समूहों की खोज'}, {'label': 'अनुप्रयोग', 'value': 'आवाज़ पहचान और चिकित्सा निदान में उपयोग'}], 'narration': 'मशीन लर्निंग आज वॉयस असिस्टेंट, सिफारिश प्रणाली और आधुनिक तकनीक को शक्ति देती है।'}]}}, 'cell biology': {'en': {'title': 'Understanding Cell Biology', 'level': 'beginner', 'language': 'en', 'topic': 'Cell Biology', 'scenes': [{'type': 'title_card', 'heading': 'The Building Block of Life', 'subheading': 'How living cells function', 'narration': 'Cells are the fundamental microscopic building blocks that carry out all essential biological processes of living things.'}, {'type': 'diagram', 'heading': 'Step 1: Key Cellular Organelles', 'items': [{'label': 'Membrane', 'value': 'Protective barrier controlling transport'}, {'label': 'Nucleus', 'value': 'Command center storing DNA genetic instructions'}, {'label': 'Mitochondria', 'value': 'Cellular powerhouse generating ATP energy'}], 'narration': 'The membrane guards the cell, the nucleus stores genetic instructions, and mitochondria produce essential energy.'}, {'type': 'summary', 'heading': 'Step 2: Key Takeaways', 'items': [{'label': 'Cell Theory', 'value': 'All living organisms are made of one or more cells'}, {'label': 'Energy Creation', 'value': 'Cellular respiration converts glucose into ATP'}, {'label': 'Division', 'value': 'Cells divide through mitosis for growth and repair'}], 'narration': 'Understanding cell biology explains the mechanisms of growth, energy, and life across all organisms.'}]}, 'hi': {'title': 'कोशिका विज्ञान कैसे काम करता है', 'level': 'beginner', 'language': 'hi', 'topic': 'Cell Biology', 'scenes': [{'type': 'title_card', 'heading': 'जीवन की मूल इकाई: कोशिका', 'subheading': 'सजीव कोशिकाओं की कार्यप्रणाली', 'narration': 'कोशिका सभी जीवित प्राणियों की सबसे छोटी और मूलभूत इकाई है जो जीवन की सभी क्रियाएं करती है।'}, {'type': 'diagram', 'heading': 'चरण १: मुख्य कोशिकांग', 'items': [{'label': 'कोशिका झिल्ली', 'value': 'सामग्री के आने-जाने पर नियंत्रण'}, {'label': 'केंद्रक', 'value': 'डीएनए और आनुवंशिक जानकारी का भंडार'}, {'label': 'माइटोकॉन्ड्रिया', 'value': 'ऊर्जा गृह जो एटीपी ऊर्जा बनाता है'}], 'narration': 'झिल्ली रक्षा करती है, केंद्रक में डीएनए सुरक्षित रहता है, और माइटोकॉन्ड्रिया ऊर्जा उत्पन्न करता है।'}, {'type': 'summary', 'heading': 'चरण २: मुख्य सारांश', 'items': [{'label': 'कोशिका सिद्धांत', 'value': 'सभी जीवित प्राणी कोशिकाओं से मिलकर बने हैं'}, {'label': 'श्वसन प्रक्रिया', 'value': 'पोषक तत्वों को ऊर्जा में बदलना'}, {'label': 'कोशिका विभाजन', 'value': 'वृद्धि और मरम्मत के लिए नई कोशिकाएं'}], 'narration': 'कोशिका विज्ञान को समझकर हम जीवन के बुनियादी रहस्यों और स्वास्थ्य को गहराई से समझ सकते हैं।'}]}}}
+
+FALLBACK_LESSONS.update(NEW_TOPICS)
+
+
+def get_curated_fallback(topic: str, language: str = "en") -> dict | None:
+    """Returns a curated high-quality lesson if topic matches our verified library, else None."""
     topic_clean = topic.lower().strip()
     lang = language.lower().strip()
     if lang not in ["en", "hi", "ta", "te", "mr", "bn"]:
         lang = "en"
-    
+
     # 1. Direct key match
     for k in FALLBACK_LESSONS:
         if k in topic_clean or topic_clean in k:
-            if lang in FALLBACK_LESSONS[k]:
-                return FALLBACK_LESSONS[k][lang]
-            return FALLBACK_LESSONS[k]["en"]
-            
-    # 2. Check for keywords
-    if any(w in topic_clean for w in ["loop", "for", "while", "iteration", "code", "python"]):
-        return FALLBACK_LESSONS["python loops"].get(lang, FALLBACK_LESSONS["python loops"]["en"])
-    if any(w in topic_clean for w in ["photo", "plant", "leaf", "sun", "chlorophyll", "biology"]):
-        return FALLBACK_LESSONS["photosynthesis"].get(lang, FALLBACK_LESSONS["photosynthesis"]["en"])
-    if any(w in topic_clean for w in ["newton", "motion", "force", "physics", "action", "reaction"]):
-        return FALLBACK_LESSONS["newton's laws"].get(lang, FALLBACK_LESSONS["newton's laws"]["en"])
-        
-    # 3. Dynamic well-structured generic fallback for any unknown topic
-    capitalized_topic = topic.strip().title()
-    if lang == "hi":
-        return {
-            "title": f"{capitalized_topic} की मूल अवधारणा",
-            "level": level,
-            "language": "hi",
-            "topic": capitalized_topic,
-            "scenes": [
-                {
-                    "type": "title_card",
-                    "heading": f"{capitalized_topic} क्या है?",
-                    "subheading": "सरल और स्पष्ट परिचय",
-                    "narration": f"आज हम {capitalized_topic} के बारे में जानेंगे और इसके मुख्य सिद्धांतों को समझेंगे।"
-                },
-                {
-                    "type": "diagram",
-                    "heading": "चरण १: मुख्य संरचना",
-                    "items": [
-                        {"label": "चरण १", "value": "मूल विचार समझना"},
-                        {"label": "चरण २", "value": "प्रक्रिया और कार्यप्रणाली"},
-                        {"label": "चरण ३", "value": "वास्तविक जीवन में उपयोग"}
-                    ],
-                    "narration": f"{capitalized_topic} व्यवस्थित चरणों में काम करता है और जटिल समस्याओं को आसान बनाता है।"
-                },
-                {
-                    "type": "summary",
-                    "heading": "चरण २: मुख्य सारांश",
-                    "items": [
-                        {"label": "बिंदु १", "value": "अवधारणा की स्पष्टता"},
-                        {"label": "बिंदु २", "value": "क्रमिक प्रगति"},
-                        {"label": "बिंदु ३", "value": "व्यावहारिक अनुप्रयोग"}
-                    ],
-                    "narration": f"संक्षेप में, {capitalized_topic} को समझने से हमें बेहतर परिणाम और अंतर्दृष्टि मिलती है।"
-                }
-            ]
-        }
-    else:
-        return {
-            "title": f"Mastering {capitalized_topic}",
-            "level": level,
-            "language": "en",
-            "topic": capitalized_topic,
-            "scenes": [
-                {
-                    "type": "title_card",
-                    "heading": f"Understanding {capitalized_topic}",
-                    "subheading": "Core concept simplified",
-                    "narration": f"Welcome! Today we explore {capitalized_topic} and discover how it works step by step."
-                },
-                {
-                    "type": "diagram",
-                    "heading": "Step 1: The Core Mechanism",
-                    "items": [
-                        {"label": "Phase 1", "value": "Initial State & Input Setup"},
-                        {"label": "Phase 2", "value": "Active Processing Cycle"},
-                        {"label": "Phase 3", "value": "Structured Output Delivery"}
-                    ],
-                    "narration": f"{capitalized_topic} operates in distinct stages, taking input conditions and transforming them smoothly."
-                },
-                {
-                    "type": "summary",
-                    "heading": "Step 2: Key Takeaways",
-                    "items": [
-                        {"label": "Clarity", "value": "Breaks complex problems into simple steps"},
-                        {"label": "Efficiency", "value": "Produces predictable and verified results"},
-                        {"label": "Foundation", "value": "Applies directly to real-world engineering"}
-                    ],
-                    "narration": f"By mastering the fundamentals of {capitalized_topic}, you can solve challenging problems with confidence."
-                }
-            ]
-        }
+            return FALLBACK_LESSONS[k].get(lang, FALLBACK_LESSONS[k].get("en"))
 
+    # 2. Semantic keyword match
+    kw_map = [
+        (["loop", "while", "iteration", "for loop"], "python loops"),
+        (["photo", "chlorophyll", "plant", "leaf"], "photosynthesis"),
+        (["newton", "motion", "action reaction", "third law"], "newton's laws"),
+        (["binary search", "bsearch", "halving search"], "binary search"),
+        (["gravity", "gravitation", "orbit", "planetary pull"], "gravity"),
+        (["water cycle", "hydrological", "rain", "evaporation", "cloud"], "water cycle"),
+        (["recursion", "recursive", "factorial", "call stack"], "recursion"),
+        (["git", "github", "version control", "commit", "branch"], "git"),
+        (["solar system", "planet", "jupiter", "mars", "sun"], "solar system"),
+        (["ohm", "circuit", "voltage", "resistance", "electric current"], "ohm's law"),
+        (["machine learning", "neural", "ai model", "artificial intelligence", "ml"], "machine learning"),
+        (["cell", "mitochondria", "organelle", "cell biology", "nucleus"], "cell biology")
+    ]
+    for keywords, target_key in kw_map:
+        if any(w in topic_clean for w in keywords):
+            if target_key in FALLBACK_LESSONS:
+                return FALLBACK_LESSONS[target_key].get(lang, FALLBACK_LESSONS[target_key].get("en"))
+
+    return None
+
+
+def get_dynamic_fallback(topic: str, language: str = "en", level: str = "beginner") -> dict:
+    """Intelligently generates topic-specific educational scenes for any novel topic."""
+    capitalized_topic = topic.strip().title()
+    topic_lower = topic.lower().strip()
+    lang = language.lower().strip()
+    if lang not in ["en", "hi", "ta", "te", "mr", "bn"]:
+        lang = "en"
+
+    is_cs = any(k in topic_lower for k in [
+        "code", "program", "algorithm", "data", "tree", "graph", "hash", "sql", "linux",
+        "docker", "api", "crypto", "stack", "queue", "function", "array", "compiler",
+        "pointer", "oop", "class", "sort", "search", "variable", "string", "database", "web", "server"
+    ])
+    is_physics = any(k in topic_lower for k in [
+        "physics", "quantum", "black hole", "force", "energy", "motion", "thermo", "heat",
+        "relativity", "magnet", "wave", "light", "optics", "sound", "velocity", "atom", "nuclear"
+    ])
+    is_bio_chem = any(k in topic_lower for k in [
+        "bio", "biology", "chem", "cell", "dna", "gene", "protein", "enzyme", "plant", "animal",
+        "human", "body", "organ", "heart", "brain", "reaction", "acid", "base", "molecule", "eco", "evolution", "virus"
+    ])
+
+    if lang == "hi":
+        if is_cs:
+            return {
+                "title": f"{capitalized_topic} कैसे काम करता है",
+                "level": level,
+                "language": "hi",
+                "topic": capitalized_topic,
+                "scenes": [
+                    {
+                        "type": "title_card",
+                        "heading": f"{capitalized_topic} क्या है?",
+                        "subheading": "संगणक विज्ञान की महत्वपूर्ण अवधारणा",
+                        "narration": f"{capitalized_topic} सॉफ्टवेयर इंजीनियरिंग में डेटा और प्रक्रियाओं को प्रबंधित करने की महत्वपूर्ण तकनीक है।"
+                    },
+                    {
+                        "type": "diagram",
+                        "heading": "चरण १: प्रक्रियात्मक प्रवाह",
+                        "items": [
+                            {"label": "१. इनपुट डेटा", "value": f"{capitalized_topic} के लिए इनपुट प्राप्त करना"},
+                            {"label": "२. लॉजिक निष्पादन", "value": "नियमों के अनुसार डेटा प्रोसेस करना"},
+                            {"label": "३. सटीक आउटपुट", "value": "सत्यापित और सुरक्षित परिणाम देना"}
+                        ],
+                        "narration": f"{capitalized_topic} में प्रत्येक निर्देश को क्रमिक रूप से निष्पादित किया जाता है ताकि सही परिणाम प्राप्त हो सके।"
+                    },
+                    {
+                        "type": "summary",
+                        "heading": "चरण २: मुख्य सारांश",
+                        "items": [
+                            {"label": "दक्षता", "value": "समय और मेमोरी की बचत"},
+                            {"label": "विश्वसनीयता", "value": "त्रुटियों को कम करना"},
+                            {"label": "व्यावहारिक उपयोग", "value": "आधुनिक सॉफ्टवेयर में आवश्यक"}
+                        ],
+                        "narration": f"संक्षेप में, {capitalized_topic} को समझने से जटिल सॉफ्टवेयर समस्याओं को आसानी से हल किया जा सकता है।"
+                    }
+                ]
+            }
+        elif is_physics:
+            return {
+                "title": f"{capitalized_topic} का भौतिक विज्ञान",
+                "level": level,
+                "language": "hi",
+                "topic": capitalized_topic,
+                "scenes": [
+                    {
+                        "type": "title_card",
+                        "heading": f"{capitalized_topic} क्या है?",
+                        "subheading": "प्रकृति के भौतिक नियम",
+                        "narration": f"{capitalized_topic} ब्रह्मांड में ऊर्जा और पदार्थ के बीच होने वाले व्यवहार को समझाने वाला महत्वपूर्ण सिद्धांत है।"
+                    },
+                    {
+                        "type": "diagram",
+                        "heading": "चरण १: भौतिक प्रक्रिया",
+                        "items": [
+                            {"label": "१. मूल कारण", "value": f"{capitalized_topic} को सक्रिय करने वाले बल"},
+                            {"label": "२. ऊर्जा हस्तांतरण", "value": "ऊर्जा का एक रूप से दूसरे में रूपांतरण"},
+                            {"label": "३. अंतिम प्रभाव", "value": "प्रकृति में दिखने वाला संतुलन"}
+                        ],
+                        "narration": "इस सिद्धांत में ऊर्जा का रूपांतरण होता है और वस्तुएं निश्चित भौतिक नियमों के अनुसार व्यवहार करती हैं।"
+                    },
+                    {
+                        "type": "summary",
+                        "heading": "चरण २: मुख्य सारांश",
+                        "items": [
+                            {"label": "नियम", "value": "सार्वभौमिक रूप से लागू"},
+                            {"label": "संरक्षण", "value": "ऊर्जा और संवेग का संरक्षण"},
+                            {"label": "उपयोग", "value": "आधुनिक तकनीक और अंतरिक्ष विज्ञान"}
+                        ],
+                        "narration": f"{capitalized_topic} के नियमों को जानकर हम प्राकृतिक घटनाओं और उन्नत तकनीक को समझ सकते हैं।"
+                    }
+                ]
+            }
+        elif is_bio_chem:
+            return {
+                "title": f"{capitalized_topic} की वैज्ञानिक संरचना",
+                "level": level,
+                "language": "hi",
+                "topic": capitalized_topic,
+                "scenes": [
+                    {
+                        "type": "title_card",
+                        "heading": f"{capitalized_topic} क्या है?",
+                        "subheading": "जीवन और रसायन का विज्ञान",
+                        "narration": f"{capitalized_topic} सजीवों में होने वाली रासायनिक और जैविक प्रक्रियाओं को संचालित करने का माध्यम है।"
+                    },
+                    {
+                        "type": "diagram",
+                        "heading": "चरण १: जैविक चक्र",
+                        "items": [
+                            {"label": "१. प्रारंभिक अणु", "value": f"{capitalized_topic} के लिए आवश्यक घटक"},
+                            {"label": "२. जैव-रासायनिक क्रिया", "value": "एंजाइम और उत्प्रेरक द्वारा रूपांतरण"},
+                            {"label": "३. जीवनदायी उत्पाद", "value": "शरीर के लिए आवश्यक ऊर्जा व वृद्धि"}
+                        ],
+                        "narration": "यह प्रक्रिया आवश्यक घटकों को उपयोगी ऊर्जा और संरचनात्मक अणुओं में परिवर्तित करती है।"
+                    },
+                    {
+                        "type": "summary",
+                        "heading": "चरण २: मुख्य सारांश",
+                        "items": [
+                            {"label": "जैविक महत्व", "value": "कोशिकाओं और जीवन के लिए अनिवार्य"},
+                            {"label": "संतुलन", "value": "शरीर में समस्थिति बनाए रखना"},
+                            {"label": "अनुसंधान", "value": "चिकित्सा और स्वास्थ्य विज्ञान में आधार"}
+                        ],
+                        "narration": f"{capitalized_topic} का अध्ययन स्वास्थ्य, चिकित्सा और प्राकृतिक जीवन को समझने की कुंजी है।"
+                    }
+                ]
+            }
+        else:
+            return {
+                "title": f"{capitalized_topic} की मूल अवधारणा",
+                "level": level,
+                "language": "hi",
+                "topic": capitalized_topic,
+                "scenes": [
+                    {
+                        "type": "title_card",
+                        "heading": f"{capitalized_topic} क्या है?",
+                        "subheading": "सरल और स्पष्ट परिचय",
+                        "narration": f"आज हम {capitalized_topic} के बारे में जानेंगे और इसके मुख्य सिद्धांतों को समझेंगे।"
+                    },
+                    {
+                        "type": "diagram",
+                        "heading": "चरण १: मुख्य संरचना",
+                        "items": [
+                            {"label": "१. आधार", "value": f"{capitalized_topic} के मूलभूत सिद्धांत"},
+                            {"label": "२. कार्यविधि", "value": "प्रणाली की मुख्य कार्यप्रणाली"},
+                            {"label": "३. अनुप्रयोग", "value": "वास्तविक जीवन में उपयोग"}
+                        ],
+                        "narration": f"{capitalized_topic} व्यवस्थित चरणों में काम करता है और व्यावहारिक जीवन में उपयोगी समाधान देता है।"
+                    },
+                    {
+                        "type": "summary",
+                        "heading": "चरण २: मुख्य सारांश",
+                        "items": [
+                            {"label": "स्पष्टता", "value": "जटिल अवधारणाओं का सरलीकरण"},
+                            {"label": "उपयोग", "value": "दैनिक समस्याओं का वैज्ञानिक समाधान"},
+                            {"label": "निष्कर्ष", "value": "बेहतर समझ और नवाचार"}
+                        ],
+                        "narration": f"संक्षेप में, {capitalized_topic} को समझने से हमें बेहतर परिणाम और रचनात्मक अंतर्दृष्टि मिलती है।"
+                    }
+                ]
+            }
+    else:
+        # English dynamic fallback
+        if is_cs:
+            return {
+                "title": f"How {capitalized_topic} Works",
+                "level": level,
+                "language": "en",
+                "topic": capitalized_topic,
+                "scenes": [
+                    {
+                        "type": "title_card",
+                        "heading": f"Understanding {capitalized_topic}",
+                        "subheading": "Core concept in computer science",
+                        "narration": f"{capitalized_topic} is an essential computing concept used to organize data and execute operations reliably."
+                    },
+                    {
+                        "type": "diagram",
+                        "heading": "Step 1: The Execution Flow",
+                        "items": [
+                            {"label": "1. Input Data", "value": f"Receive and validate inputs for {capitalized_topic}"},
+                            {"label": "2. Core Logic", "value": "Execute deterministic algorithmic instructions"},
+                            {"label": "3. Validated Output", "value": "Return optimal computed result"}
+                        ],
+                        "narration": f"{capitalized_topic} processes inputs through structured computational steps to produce predictable, error-free results."
+                    },
+                    {
+                        "type": "summary",
+                        "heading": "Step 2: Key Takeaways",
+                        "items": [
+                            {"label": "Efficiency", "value": "Minimizes time and memory consumption"},
+                            {"label": "Modularity", "value": "Enables scalable software architectures"},
+                            {"label": "Application", "value": "Found across web, operating systems, and databases"}
+                        ],
+                        "narration": f"Mastering {capitalized_topic} empowers developers to build efficient, scalable, and resilient software."
+                    }
+                ]
+            }
+        elif is_physics:
+            return {
+                "title": f"The Physics of {capitalized_topic}",
+                "level": level,
+                "language": "en",
+                "topic": capitalized_topic,
+                "scenes": [
+                    {
+                        "type": "title_card",
+                        "heading": f"Exploring {capitalized_topic}",
+                        "subheading": "Fundamental laws of the physical universe",
+                        "narration": f"{capitalized_topic} describes how energy, forces, and matter interact across time and space."
+                    },
+                    {
+                        "type": "diagram",
+                        "heading": "Step 1: The Physical Mechanism",
+                        "items": [
+                            {"label": "1. Underlying Force", "value": f"Initial forces driving {capitalized_topic}"},
+                            {"label": "2. Energy Exchange", "value": "Dynamic transfer between potential and kinetic states"},
+                            {"label": "3. Equilibrium", "value": "Stable physical state reached in nature"}
+                        ],
+                        "narration": f"Through {capitalized_topic}, physical forces transfer energy until the system reaches a natural equilibrium."
+                    },
+                    {
+                        "type": "summary",
+                        "heading": "Step 2: Key Takeaways",
+                        "items": [
+                            {"label": "Conservation", "value": "Energy and momentum remain strictly conserved"},
+                            {"label": "Universality", "value": "Applies across Earth and deep cosmological space"},
+                            {"label": "Engineering", "value": "Enables aerospace, robotics, and energy systems"}
+                        ],
+                        "narration": f"The principles of {capitalized_topic} form the cornerstone of modern engineering and astrophysics."
+                    }
+                ]
+            }
+        elif is_bio_chem:
+            return {
+                "title": f"Understanding {capitalized_topic}",
+                "level": level,
+                "language": "en",
+                "topic": capitalized_topic,
+                "scenes": [
+                    {
+                        "type": "title_card",
+                        "heading": f"What is {capitalized_topic}?",
+                        "subheading": "Biological and chemical processes of life",
+                        "narration": f"{capitalized_topic} is a vital scientific mechanism that regulates cellular function and biological chemistry."
+                    },
+                    {
+                        "type": "diagram",
+                        "heading": "Step 1: The Biological Pathway",
+                        "items": [
+                            {"label": "1. Raw Precursors", "value": f"Essential compounds required for {capitalized_topic}"},
+                            {"label": "2. Catalytic Action", "value": "Enzymatic reaction driving the transformation"},
+                            {"label": "3. Vital Products", "value": "Yields energy and building blocks for organisms"}
+                        ],
+                        "narration": f"{capitalized_topic} converts precursor molecules into functional biological products to sustain living systems."
+                    },
+                    {
+                        "type": "summary",
+                        "heading": "Step 2: Key Takeaways",
+                        "items": [
+                            {"label": "Homeostasis", "value": "Maintains chemical balance inside organisms"},
+                            {"label": "Vitality", "value": "Drives growth, cellular repair, and respiration"},
+                            {"label": "Medicine", "value": "Crucial for therapeutics, vaccines, and health"}
+                        ],
+                        "narration": f"Understanding {capitalized_topic} gives us profound insights into medicine, genetics, and the origin of life."
+                    }
+                ]
+            }
+        else:
+            return {
+                "title": f"Mastering {capitalized_topic}",
+                "level": level,
+                "language": "en",
+                "topic": capitalized_topic,
+                "scenes": [
+                    {
+                        "type": "title_card",
+                        "heading": f"Understanding {capitalized_topic}",
+                        "subheading": "Core concept simplified",
+                        "narration": f"Welcome! Today we explore {capitalized_topic} and discover how it works step by step."
+                    },
+                    {
+                        "type": "diagram",
+                        "heading": "Step 1: The Core Mechanism",
+                        "items": [
+                            {"label": "1. Foundation", "value": f"Fundamental premise behind {capitalized_topic}"},
+                            {"label": "2. Operation", "value": "Active mechanism driving the system"},
+                            {"label": "3. Application", "value": "Practical outcomes in real-world environments"}
+                        ],
+                        "narration": f"{capitalized_topic} operates in distinct stages, taking input conditions and transforming them smoothly."
+                    },
+                    {
+                        "type": "summary",
+                        "heading": "Step 2: Key Takeaways",
+                        "items": [
+                            {"label": "Clarity", "value": "Breaks complex problems into simple steps"},
+                            {"label": "Efficiency", "value": "Produces predictable and verified results"},
+                            {"label": "Impact", "value": "Applies directly to modern science and engineering"}
+                        ],
+                        "narration": f"By mastering the fundamentals of {capitalized_topic}, you can solve challenging problems with confidence."
+                    }
+                ]
+            }
+
+
+def get_fallback_lesson(topic: str, language: str = "en", level: str = "beginner") -> dict:
+    """Finds best matching curated fallback or builds a dynamic topic-tailored lesson."""
+    curated = get_curated_fallback(topic, language=language)
+    if curated:
+        return curated
+    return get_dynamic_fallback(topic, language=language, level=level)

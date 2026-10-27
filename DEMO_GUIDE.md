@@ -90,3 +90,4 @@ Showcase the 3 key bonus capabilities:
 
 #### Q4: "Are all models and code permissible for open source?"
 > *"Yes. Qwen 2.5 is Apache 2.0, Kokoro ONNX is Apache 2.0, FFmpeg is LGPL/GPL, and Nirmala UI is licensed for Windows rendering. Full details and specifications are in our README.md."*
+

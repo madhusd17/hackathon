@@ -15,9 +15,20 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_DIR = os.path.join(BASE_DIR, "cache")
 
 
-def get_cache_key(topic: str, language: str, level: str, voice: str = "hf_alpha") -> str:
+def get_cache_key(
+    topic: str,
+    language: str,
+    level: str,
+    voice: str = "hf_alpha",
+    speed: float = 1.0,
+    target_length: int = 45,
+) -> str:
     """Generates a stable cache key string."""
     raw = f"{topic.strip().lower()}_{language.strip().lower()}_{level.strip().lower()}_{voice.strip().lower()}"
+    if speed != 1.0:
+        raw += f"_speed_{format(float(speed), '.17g')}"
+    if target_length != 45:
+        raw += f"_length_{int(target_length)}"
     return hashlib.md5(raw.encode("utf-8")).hexdigest()[:12]
 
 
@@ -79,4 +90,3 @@ def list_cached_lessons() -> list[dict]:
             except Exception:
                 pass
     return results
-

@@ -9,7 +9,7 @@ import logging
 import time
 import requests
 from jsonschema import validate, ValidationError
-from core.fallbacks import get_fallback_lesson
+from core.fallbacks import get_fallback_lesson, get_curated_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +54,15 @@ def generate_lesson_plan(topic: str, level: str = "beginner", language: str = "e
     Returns: (lesson_json, used_fallback, elapsed_seconds)
     """
     t0 = time.time()
+
+    # 1. Check curated library for instant, high-quality pedagogical lessons
+    curated = get_curated_fallback(topic, language=language)
+    if curated:
+        elapsed = time.time() - t0
+        return curated, False, elapsed
+
+    # 2. For custom topics, prompt local LLM (Ollama qwen2.5:3b)
     num_scenes = 3 if target_length <= 40 else 4
-    
-    # Prompt instructing small LLM to output pure JSON
     prompt = f"""You are an educational video script planner.
 Create a concise, structured visual lesson plan for school students.
 Topic: {topic}
@@ -112,15 +118,22 @@ Output valid JSON:"""
                 "format": "json",
                 "options": {
                     "temperature": 0.2,
-                    "num_predict": 700
+                    "num_predict": 300,
+                    "num_thread": 4,
+                    "num_ctx": 1024
                 }
             },
-            timeout=15
+            timeout=25
         )
         if response.status_code == 200:
             raw_text = response.json().get("response", "").strip()
-            # Parse json
-            plan = json.loads(raw_text)
+            start_idx = raw_text.find("{")
+            end_idx = raw_text.rfind("}")
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                plan = json.loads(raw_text[start_idx:end_idx + 1])
+            else:
+                plan = json.loads(raw_text)
+
             # Schema validation
             validate(instance=plan, schema=LESSON_SCHEMA)
             plan["topic"] = topic
@@ -132,9 +145,9 @@ Output valid JSON:"""
             elapsed = time.time() - t0
             return plan, False, elapsed
     except Exception as e:
-        logger.warning(f"Ollama generation or validation failed ({e}), falling back to curated lesson.")
+        logger.warning(f"Ollama generation or validation failed ({e}), falling back to intelligent lesson generator.")
 
-    # Graceful Fallback
+    # Graceful Fallback (Domain-aware dynamic lesson)
     fallback = get_fallback_lesson(topic, language=language, level=level)
     elapsed = time.time() - t0
     return fallback, True, elapsed
@@ -156,11 +169,11 @@ def translate_lesson_plan(plan: dict, target_lang: str) -> dict:
     if not target_name:
         return plan
 
-    # Check if a fallback already exists for this topic in target language
+    # Check if a curated lesson exists for this topic in target language
     topic = plan.get("topic", plan.get("title", ""))
-    fb = get_fallback_lesson(topic, language=target_lang, level=plan.get("level", "beginner"))
-    if fb and fb.get("language") == target_lang:
-        return fb
+    curated = get_curated_fallback(topic, language=target_lang)
+    if curated and curated.get("language") == target_lang:
+        return curated
 
     # Attempt fast sentence-by-sentence translation
     try:
@@ -175,9 +188,9 @@ def translate_lesson_plan(plan: dict, target_lang: str) -> dict:
                     "model": MODEL_NAME,
                     "prompt": trans_prompt,
                     "stream": False,
-                    "options": {"temperature": 0.1, "num_predict": 100}
+                    "options": {"temperature": 0.1, "num_predict": 100, "num_thread": 4, "num_ctx": 512}
                 },
-                timeout=12
+                timeout=10
             )
             if res.status_code == 200:
                 translated_text = res.json().get("response", "").strip()
@@ -187,7 +200,9 @@ def translate_lesson_plan(plan: dict, target_lang: str) -> dict:
             
         plan["scenes"] = translated_scenes
         plan["language"] = target_lang
+        return plan
     except Exception as e:
         logger.warning(f"Translation call failed: {e}")
 
-    return plan
+    # If translation call fails, use dynamic fallback in target language
+    return get_fallback_lesson(topic, language=target_lang, level=plan.get("level", "beginner"))

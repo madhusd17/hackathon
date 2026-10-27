@@ -14,3 +14,4 @@ Write-Host ""
 Write-Host "[2/2] Launching Blu Visual Teacher at http://127.0.0.1:5000 ..." -ForegroundColor Green
 Start-Process "http://127.0.0.1:5000"
 python app.py
+
