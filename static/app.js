@@ -412,6 +412,19 @@ function updateTimeDisplay() {
   // Progress scrub fill
   const pct = Math.min(100, (currentTotalTime / totalDuration) * 100);
   document.getElementById("scrub-fill").style.width = `${pct}%`;
+
+  // Dynamic step node highlighting for diagrams
+  if (currentScene && currentScene.type === "diagram") {
+    const nodes = document.querySelectorAll(".diagram-node");
+    if (nodes.length > 0) {
+      const sceneDur = currentScene.duration || 1;
+      const progress = Math.min(0.99, audioPlayer.currentTime / sceneDur);
+      const activeIdx = Math.floor(progress * nodes.length);
+      nodes.forEach((n, idx) => {
+        n.classList.toggle("active-node", idx === activeIdx);
+      });
+    }
+  }
 }
 
 function prevScene() {
@@ -636,22 +649,18 @@ async function loadCachedLessons() {
 }
 
 async function loadCachedItem(cacheKey) {
-  // Fetch from generate endpoint without refresh to grab cached version immediately
-  const form = document.getElementById("lesson-form");
-  const res = await fetch("/api/generate_full_lesson", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      topic: cacheKey,
-      force_refresh: false
-    })
-  });
-  const data = await res.json();
-  if (data.success) {
-    currentLesson = data.lesson;
-    currentFolder = data.folder;
-    displayMetrics(data.metrics, true);
-    loadLessonIntoPlayer(currentLesson, currentFolder);
+  try {
+    const res = await fetch(`/api/load_cache/${cacheKey}`);
+    const data = await res.json();
+    if (data.success) {
+      currentLesson = data.lesson;
+      currentFolder = data.folder;
+      displayMetrics(data.metrics, true);
+      loadLessonIntoPlayer(currentLesson, currentFolder);
+      play();
+    }
+  } catch (err) {
+    console.error("Error loading cached lesson:", err);
   }
 }
 

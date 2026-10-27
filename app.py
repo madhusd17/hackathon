@@ -215,24 +215,49 @@ def edit_scene():
     })
 
 
+@app.route("/api/load_cache/<key>")
+def load_cache_by_key(key):
+    """Loads a cached lesson directly by its hash key."""
+    cached = get_cached_lesson(key)
+    if cached:
+        return jsonify({
+            "success": True,
+            "cached": True,
+            "lesson": cached,
+            "folder": f"cache/{key}",
+            "metrics": {
+                "planner_s": 0.01,
+                "tts_s": 0.01,
+                "video_s": 0.01,
+                "total_s": 0.01,
+                "used_fallback": False
+            }
+        })
+    return jsonify({"success": False, "error": "Not found in cache"}), 404
+
+
 @app.route("/api/cached_lessons", methods=["GET"])
 def get_cached_lessons():
     """Returns library of cached lessons."""
     return jsonify({"lessons": list_cached_lessons()})
 
 
-@app.route("/media/<path:folder>/<path:filename>")
-def serve_media(folder, filename):
-    """Serves media files (WAV, PNG, MP4, SRT)."""
-    target_dir = os.path.join(BASE_DIR, folder)
-    return send_from_directory(target_dir, filename)
+@app.route("/media/<path:filepath>")
+def serve_media(filepath):
+    """Serves media files (WAV, PNG, MP4, SRT) supporting nested paths."""
+    full_path = os.path.join(BASE_DIR, filepath)
+    dir_name = os.path.dirname(full_path)
+    file_name = os.path.basename(full_path)
+    return send_from_directory(dir_name, file_name)
 
 
-@app.route("/api/download/<path:folder>/<path:filename>")
-def download_media(folder, filename):
-    """Downloads artifact with proper attachment header."""
-    target_dir = os.path.join(BASE_DIR, folder)
-    return send_from_directory(target_dir, filename, as_attachment=True)
+@app.route("/api/download/<path:filepath>")
+def download_media(filepath):
+    """Downloads artifact with proper attachment header supporting nested paths."""
+    full_path = os.path.join(BASE_DIR, filepath)
+    dir_name = os.path.dirname(full_path)
+    file_name = os.path.basename(full_path)
+    return send_from_directory(dir_name, file_name, as_attachment=True)
 
 
 if __name__ == "__main__":
